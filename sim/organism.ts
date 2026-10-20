@@ -200,6 +200,7 @@ export class OrganismInstance {
     // feather in response to the parent stalk's *physical motor oscillator*,
     // never an animation-only timer or an imposed body translation.
     const phases = new Map(this.joints.map(j => [j.child.id, j.jointPhase]));
+    const genesByChild = new Map(this.joints.map(j => [j.child.id, j.child.partGene]));
     let outIdx=0;
     for(const joint of this.joints) {
       const g=joint.child.partGene, outputs=this.brain.outputs;
@@ -213,10 +214,19 @@ export class OrganismInstance {
       const correction = joint === leader ? 0 : -phaseCouplingPerSecond * wrappedError;
       joint.jointPhase=THREE.MathUtils.euclideanModulo(joint.jointPhase+(2*Math.PI*frequency+correction)*subDt,2*Math.PI);
       const parentPhase = phases.get(g.parentId ?? '');
+      const parentGene = genesByChild.get(g.parentId ?? '');
+      // Relative-frequency neural output on the feather motor must still matter.
+      // The child oscillator is entrained to the parent but can lead/lag its
+      // inherited offset through its own independent neural frequency channel.
+      const inheritedOffset = g.motorPhase - (parentGene?.motorPhase ?? 0);
+      const phaseError = parentPhase === undefined ? 0 : Math.atan2(
+        Math.sin(joint.jointPhase - parentPhase - inheritedOffset),
+        Math.cos(joint.jointPhase - parentPhase - inheritedOffset));
+      const featherPhase = (parentPhase ?? joint.jointPhase) + phaseError;
       const target = g.motorFeatherAngle === undefined
         ? g.restAngle + offset + (g.maxAngle-g.minAngle) * .45 * strokeWave(joint.jointPhase, g.motorStrokeDuty ?? .5)
         : THREE.MathUtils.clamp(
-            g.restAngle + offset + g.motorFeatherAngle * recoveryFeatherWeight(parentPhase ?? joint.jointPhase),
+            g.restAngle + offset + g.motorFeatherAngle * recoveryFeatherWeight(featherPhase),
             g.minAngle, g.maxAngle
           );
       joint.applyMotorAndLimits(target,allowance,stiffness,60);
