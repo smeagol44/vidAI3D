@@ -5,7 +5,7 @@ import { OrganismInstance } from './organism';
 import { DEFAULT_WATER_RESISTANCE, PHYSICS_DT } from './physics';
 
 export interface VerificationReport { testName: string; passed: boolean; measurement: string; details: string }
-export type FounderType = 'planar_swimmer' | '3d_serpent' | 'tri_limb';
+export type FounderType = 'planar_swimmer' | '3d_serpent' | 'tri_limb' | 'fin_tail';
 
 /** Production-path, isolated physical reference. No biology changes or replenishment. */
 export function measureReference(type: FounderType, options: {seconds?: number; mu?: number; motors?: boolean; rotation?: THREE.Quaternion} = {}) {

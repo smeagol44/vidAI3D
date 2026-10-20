@@ -3,7 +3,7 @@ import { OrganismGenome, VoxelPartGene, NeuralGene, FaceDirection, isBroadFace, 
 import { PRNG } from './prng';
 import { viableEggFunding } from './energy';
 
-export function createFounderGenome(id: string, name: string, prng: PRNG, type: 'planar_swimmer' | '3d_serpent' | 'tri_limb'): OrganismGenome {
+export function createFounderGenome(id: string, name: string, prng: PRNG, type: 'planar_swimmer' | '3d_serpent' | 'tri_limb' | 'fin_tail'): OrganismGenome {
   const parts: VoxelPartGene[] = [];
   const palette = ['#06b6d4', '#3b82f6', '#8b5cf6', '#ec4899', '#f97316', '#eab308', '#10b981', '#14b8a6'];
   const color = palette[prng.rangeInt(0, palette.length - 1)];
@@ -222,6 +222,45 @@ export function createFounderGenome(id: string, name: string, prng: PRNG, type: 
   // in controlled tests. The planar template retains its calibrated 400 N m.
   for(const p of parts) { p.motorFrequency=.65; p.motorMaxTorque=type==='3d_serpent'?600:400; }
 
+  if (type === 'fin_tail') {
+    // New independently named starter, not a retrofit of tri_limb or saved
+    // genomes. Three-dimensional forward travel uses two jointed axial links
+    // plus actual slender blades, each feathered by a perpendicular hinge.
+    // All shape and controller values are ordinary mutable inherited traits.
+    const [root,left,right] = parts;
+    for (const [i,stalk] of [left,right].entries()) {
+      stalk.dimX=2;stalk.dimY=1;stalk.dimZ=2;
+      stalk.hingeAxis='Y';stalk.motorPhase=i*Math.PI;
+      stalk.motorFrequency=.65;stalk.motorMaxTorque=800;
+      stalk.motorStrokeDuty=.25;
+    }
+    let parentId = root.id;
+    for (let i=0;i<2;i++) {
+      const p: VoxelPartGene = {
+        ...left,id:`axial-${i}`,parentId,
+        parentFace:'+Z',attachFace:'-Z',
+        dimX:1,dimY:1,dimZ:3,hingeAxis:'Y',
+        motorMaxTorque:400,motorFrequency:.65,
+        motorPhase:(i+1)*Math.PI/2,
+        motorStrokeDuty:undefined,hasMouth:false,hasEye:false,
+      };
+      parts.push(p);parentId=p.id;
+    }
+    for(const [i,stalk] of [left,right].entries()){
+      const sign = i===0?1:-1;
+      parts.push({
+        ...stalk,id:`blade-${i}`,parentId:stalk.id,
+        parentFace:'+Z',attachFace:'-Z',
+        dimX:1,dimY:1,dimZ:4,thicknessScaleY:.2,
+        hingeAxis:'Z',minAngle:-Math.PI*.49,maxAngle:Math.PI*.49,
+        motorPhase:(i+.5)*Math.PI,motorMaxTorque:800,
+        motorStrokeDuty:undefined,
+        restAngle:sign*1.35,motorFeatherAngle:-sign*1.35,
+        hasMouth:false,hasEye:false
+      });
+    }
+  }
+
   const hiddenCount = 24;
   const timeConstants: number[] = [];
   const biases: number[] = [];
@@ -248,7 +287,7 @@ export function createFounderGenome(id: string, name: string, prng: PRNG, type: 
     inputWeights.push(inRow);
   }
 
-  for (let o = 0; o < 20; o++) {
+  for (let o = 0; o < Math.max(20, (parts.length-1)*4); o++) {
     // Fresh founders inherit a useful, nonzero neural controller around the
     // calibrated oscillator gait. Angle trim and stiffness begin with gentle
     // authority; mutations below can evolve stronger commands over generations.
