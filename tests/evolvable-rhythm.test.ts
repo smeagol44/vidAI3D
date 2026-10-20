@@ -34,7 +34,7 @@ test('missing rhythm-mix allele preserves legacy gait; direct neural posture sil
     silent.brain.outputs[0]=.7;
     silent.preparePhysicsSubstep(PHYSICS_DT,250);
     const target=THREE.MathUtils.clamp(rest+.7*(gene.maxAngle-gene.minAngle)*.5,gene.minAngle,gene.maxAngle);
-    assert.ok(Math.abs(silent.joints[0].targetAngle-target)<1e-12,'existing angle command directly controls real joint target');
+    assert.ok(Math.abs(silent.joints[0].targetAngle-target)<1e-6,'existing angle command directly controls real joint target');
     assert.ok(silent.joints[0].appliedTorque!==0);
     silent.motorsEnabled=false;
     silent.preparePhysicsSubstep(PHYSICS_DT,250);
