@@ -81,6 +81,8 @@ export function bodyLayout(genome: OrganismGenome, position: THREE.Vector3, rota
   for (const p of genome.parts) {
     if (ids.has(p.id) || !['X','Y','Z'].includes(p.hingeAxis) || ![p.dimX,p.dimY,p.dimZ].every(n=>Number.isInteger(n)&&n>=1&&n<=5)
       || (p.thicknessScaleY !== undefined && (!Number.isFinite(p.thicknessScaleY) || p.thicknessScaleY < MIN_THICKNESS_SCALE_Y || p.thicknessScaleY > 1))
+      || (p.motorStrokeDuty !== undefined && (!Number.isFinite(p.motorStrokeDuty) || p.motorStrokeDuty < .2 || p.motorStrokeDuty > .8))
+      || (p.motorFeatherAngle !== undefined && (!Number.isFinite(p.motorFeatherAngle) || Math.abs(p.motorFeatherAngle) > Math.PI / 2))
       || ![p.minAngle,p.maxAngle,p.restAngle,p.motorMaxTorque,p.motorFrequency,p.motorPhase].every(Number.isFinite)
       || p.minAngle > p.maxAngle || p.restAngle < p.minAngle || p.restAngle > p.maxAngle || p.minAngle <= -Math.PI || p.maxAngle >= Math.PI || p.motorMaxTorque < 0 || p.motorFrequency < 0)
       throw new Error('Invalid physical part: ' + p.id);
