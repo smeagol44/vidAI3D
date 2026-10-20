@@ -179,6 +179,15 @@ export class OrganismInstance {
     for(const joint of this.joints) joint.updateJointKinematics();
     for(const b of this.bodies) b.applyHydrodynamics(mu);
     if(!Array.from(this.brain.outputs).every(Number.isFinite)) throw new Error('Non-finite neural motor command.');
+    // Couple the inherited multi-joint gait instead of letting independent neural
+    // frequency perturbations accumulate unlimited phase drift. The first joint is
+    // the carrier; all joints still respond to their own neural frequency commands,
+    // and inherited phase offsets (which mutation can change) remain authoritative.
+    // This is oscillator coordination, not a force or position correction.
+    const leader = this.joints[0];
+    const leaderPhase = leader?.jointPhase ?? 0;
+    const leaderGeneticPhase = leader?.child.partGene.motorPhase ?? 0;
+    const phaseCouplingPerSecond = 3;
     let outIdx=0;
     for(const joint of this.joints) {
       const g=joint.child.partGene, outputs=this.brain.outputs;
@@ -186,7 +195,11 @@ export class OrganismInstance {
       const frequency=g.motorFrequency*(1+(outputs[outIdx+1]||0)*.5);
       const allowance=this.reserves>0&&this.motorsEnabled ? Math.max(0,((outputs[outIdx+2]??0)+1)*.5*g.motorMaxTorque) : 0;
       const stiffness=Math.max(0,((outputs[outIdx+3]??0)+1)*.5*900);
-      joint.jointPhase=(joint.jointPhase+2*Math.PI*frequency*subDt)%(2*Math.PI);
+      const desiredDifference = g.motorPhase - leaderGeneticPhase;
+      const differenceError = joint.jointPhase - leaderPhase - desiredDifference;
+      const wrappedError = Math.atan2(Math.sin(differenceError), Math.cos(differenceError));
+      const correction = joint === leader ? 0 : -phaseCouplingPerSecond * wrappedError;
+      joint.jointPhase=THREE.MathUtils.euclideanModulo(joint.jointPhase+(2*Math.PI*frequency+correction)*subDt,2*Math.PI);
       const target=g.restAngle+offset+(g.maxAngle-g.minAngle)*.45*Math.sin(joint.jointPhase);
       joint.applyMotorAndLimits(target,allowance,stiffness,60);
       outIdx+=4;
