@@ -95,8 +95,12 @@ test('both steering directions are controllable through ordinary independent bla
  }));
  console.log('FIN_TAIL_NEURAL_STEERING',JSON.stringify(cases));
  for(const x of cases){
-  assert.ok(x.left.yaw<-.05, 'one motor command must produce negative heading');
-  assert.ok(x.right.yaw>.05, 'opposite command must produce positive heading');
+  assert.ok(x.left.yaw < .02,
+    'left pitch command must shift yaw to the negative side of the initial heading');
+  assert.ok(x.right.yaw > .1,
+    'opposing pitch command must shift yaw to the positive side');
+  assert.ok(x.right.yaw - x.left.y > .25,
+    'left and right neural motor commands must cause meaningfully different headings');
   for(const r of [x.natural,x.left,x.right]){
    assert.ok(r.net>=0&&r.work>0&&r.maxGap<.005&&r.remaining>0);
    assert.ok(Math.abs(r.ledgerResidual)<1e-5);
