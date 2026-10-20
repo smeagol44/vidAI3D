@@ -51,15 +51,23 @@ test('a feather hinge uses its parent phase, still consumes real motor work and 
   assert.equal(o.joints.length,4);
   // Positive parent stroke holds the blade close to its broad-face target.
   o.joints[0].jointPhase=0;
-  o.joints[1].jointPhase=0;
+  o.joints[1].jointPhase=Math.PI*.5;
   o.preparePhysicsSubstep(PHYSICS_DT,250);
   const duringPower=o.joints[1].targetAngle;
   o.joints[0].jointPhase=Math.PI;
+  o.joints[1].jointPhase=Math.PI*1.5;
   o.preparePhysicsSubstep(PHYSICS_DT,250);
   const duringRecovery=o.joints[1].targetAngle;
   assert.ok(duringRecovery-duringPower>.9,{duringRecovery,duringPower}.toString());
   assert.ok(duringRecovery <= o.joints[1].maxAngle);
-  for(let i=0;i<240;i++)o.updatePhysicsSubstep();
+  // With the parent held at the same phase, neural modulation of the child
+  // relative oscillator still advances its feathering transition.
+  o.joints[1].jointPhase=Math.PI;
+  o.preparePhysicsSubstep(PHYSICS_DT,250);
+  const changedRelativePhase=o.joints[1].targetAngle;
+  assert.ok(Math.abs(changedRelativePhase-duringRecovery)>.05,
+    'relative feather frequency channel must not become a dead neural output');
+  for(let i=0;i<240;i++ )o.updatePhysicsSubstep();
   assert.ok(o.totalWorkJoules>0);
   assert.ok(o.joints.every(j=>j.anchorError<.005 && j.axisError<.01));
  }finally{o.dispose();}
@@ -83,7 +91,7 @@ test('power stroke and recovery pitch are genetically inherited and can mutate',
 });
 
 test('living full-ecosystem feather orientation / duty: true physical signed travel and net per energy',()=>{
- const options=[{duty:.5,pitch:0,width:2,legacy:true}];
+ const options=[{duty:.5,pitch:0,width:2,legacy:true},{duty:.5,pitch:0,width:4,legacy:true}];
  for(const duty of [.25,.5,.75])
  for(const pitch of [-1.35,-.75,0,.75,1.35])
  for(const width of [2,4])
@@ -120,7 +128,7 @@ test('living full-ecosystem feather orientation / duty: true physical signed tra
   }finally{sim.dispose();}
  }
  const ranked=[...records].sort((a,b)=>b.forward-a.forward);
- console.log('POWER_RECOVERY_GAIT_EVIDENCE',JSON.stringify({baseline:records[0],best:ranked.slice(0,15),
+ console.log('POWER_RECOVERY_GAIT_EVIDENCE',JSON.stringify({baseline:records[0],largeBladeControl:records[1],best:ranked.slice(0,15),
    worst:ranked.slice(-5),cases:records.length}));
  assert.ok(records.every(r=>Number.isFinite(r.net)&&r.path>=r.net&&r.energy>0&&r.maxGap<.005
   &&Math.abs(r.residual)<1e-5&&r.remain>0));
