@@ -1,5 +1,13 @@
 # VIDA 3D project status
 
+## 2026-10-20 — v0.2.9 Phase B: independently evolvable neural/rhythmic motor mixing and physical locomotion observation
+
+VIDA 3D now supports an optional, bounded inherited `motorRhythmMix` on physical hinge parts. A small ordinary offspring mutation can introduce or change a 0–1 rhythmic contribution without adding neural channels or body forces. Zero mix disables mandatory sinusoidal/feathered target movement on that joint and gives the existing neural Angle output direct posture authority; partial values blend both. **Absent trait retains the exact old target equation**, preserving existing founder behavior and imported saved DNA. Genome import/physical construction independently validate the bounded finite trait. This is informed by the latest VIDA 2D motor design **read-only**; the two projects retain independent implementations.
+
+The organism inspector now exposes actual net mass-weighted COM displacement since construction, accumulated physical COM path and net metres per chemical motor-energy unit. These values are diagnostic, not sensory inputs or fitness grants. Motor work, drag, genetically mutable neural connections, Rapier forces and the chemical ledger remain unchanged.
+
+**Scope:** this enables more evolvable motor strategies and more accountable observation. It is **not** a blanket speed boost or proof of useful autonomous foraging. Static/production-path tests check direct-mode target independence, mixed target values, real movement and energy accounting, mutation/validation/legacy defaults, and preserve the prior locomotion suite; longer ecosystem adaptation remains open.
+
 ## 2026-10-20 — v0.2.8 Phase A: measured mortality and finite, funded survival calibration
 
 A deterministic 45 simulated-second default 14-founder world on v0.2.7 had **14 alive at 10 s**, **11 at 40 s**, and **9 at 45 s**, with **0 eggs laid**. Planar/serpent founders began with 314 reserve and fin-tails 482. Basal costs were 0.557/0.641 chemical units per second, but six-link motor costs reached ~230–254 units by 30 s for several founders. Total real-mouth food intake across the world was ~305 units in 45 s, insufficient to support all organisms; age expiry was 160 s and not a plausible cause of early death. Five-fold simulation speed would compress 45 simulated seconds into roughly nine wall seconds **only when achieved throughput permits**. Energy ledger residual was ~5×10⁻¹⁰.

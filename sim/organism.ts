@@ -81,6 +81,7 @@ export function bodyLayout(genome: OrganismGenome, position: THREE.Vector3, rota
   for (const p of genome.parts) {
     if (ids.has(p.id) || !['X','Y','Z'].includes(p.hingeAxis) || ![p.dimX,p.dimY,p.dimZ].every(n=>Number.isInteger(n)&&n>=1&&n<=5)
       || (p.thicknessScaleY !== undefined && (!Number.isFinite(p.thicknessScaleY) || p.thicknessScaleY < MIN_THICKNESS_SCALE_Y || p.thicknessScaleY > 1))
+      || (p.motorRhythmMix !== undefined && (!Number.isFinite(p.motorRhythmMix) || p.motorRhythmMix < 0 || p.motorRhythmMix > 1))
       || (p.motorStrokeDuty !== undefined && (!Number.isFinite(p.motorStrokeDuty) || p.motorStrokeDuty < .2 || p.motorStrokeDuty > .8))
       || (p.motorFeatherAngle !== undefined && (!Number.isFinite(p.motorFeatherAngle) || Math.abs(p.motorFeatherAngle) > Math.PI / 2))
       || ![p.minAngle,p.maxAngle,p.restAngle,p.motorMaxTorque,p.motorFrequency,p.motorPhase].every(Number.isFinite)
@@ -136,6 +137,13 @@ export class OrganismInstance {
   public eyeRayRGBs: THREE.Color[] = [];
   public com: THREE.Vector3 = new THREE.Vector3();
   public comVel: THREE.Vector3 = new THREE.Vector3();
+  /** Observational coordinates only; no influence on motor or physical forces. */
+  public initialCOM: THREE.Vector3 = new THREE.Vector3();
+  public totalTravelMeters = 0;
+  public get netTravelMeters(): number { return this.com.distanceTo(this.initialCOM); }
+  public get netMetersPerMotorUnit(): number {
+    return this.totalMotorChemicalSpent > 0 ? this.netTravelMeters / this.totalMotorChemicalSpent : 0;
+  }
   public mass: number = 1;
   public motorsEnabled: boolean = true;
   public hasPhysicsError: boolean = false;
@@ -166,6 +174,7 @@ export class OrganismInstance {
         g.hingeAxis,g.minAngle,g.maxAngle,g.restAngle,g.motorMaxTorque,g.motorPhase,pose.alignment));
     }
     this.updateCOM();
+    this.initialCOM.copy(this.com);
   }
 
   dispose() {
@@ -228,10 +237,15 @@ export class OrganismInstance {
         Math.sin(joint.jointPhase - parentPhase - inheritedOffset),
         Math.cos(joint.jointPhase - parentPhase - inheritedOffset));
       const featherPhase = (parentPhase ?? joint.jointPhase) + phaseError;
+      // Evolved oscillator/direct mix, inspired by VIDA 2D's optional rhythm.
+      // Missing allele = exact legacy target for old founders and imported DNA.
+      // At zero mix the existing Angle neural channel drives the entire joint
+      // posture without a prescribed wave; all force still comes from Rapier motors.
+      const rhythmMix = g.motorRhythmMix ?? 1;
       const target = g.motorFeatherAngle === undefined
-        ? g.restAngle + offset + (g.maxAngle-g.minAngle) * .45 * strokeWave(joint.jointPhase, g.motorStrokeDuty ?? .5)
+        ? g.restAngle + offset + rhythmMix * (g.maxAngle-g.minAngle) * .45 * strokeWave(joint.jointPhase, g.motorStrokeDuty ?? .5)
         : THREE.MathUtils.clamp(
-            g.restAngle + offset + g.motorFeatherAngle * recoveryFeatherWeight(featherPhase),
+            g.restAngle + offset + rhythmMix * g.motorFeatherAngle * recoveryFeatherWeight(featherPhase),
             g.minAngle, g.maxAngle
           );
       joint.applyMotorAndLimits(target,allowance,stiffness,60);
@@ -249,7 +263,9 @@ export class OrganismInstance {
       this.reserves -= spent;
       this.totalMotorChemicalSpent += spent;
     }
+    const oldCOM = this.com.clone();
     this.updateCOM();
+    this.totalTravelMeters += this.com.distanceTo(oldCOM);
   }
   public updatePhysicsSubstep(subDt=PHYSICS_DT, mu=250) {
     if(!this.ownsPhysics) throw new Error('Shared organisms must be stepped by WorldSimulation.');

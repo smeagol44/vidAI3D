@@ -397,6 +397,14 @@ export default function App() {
                 <span className="font-mono text-slate-200">{(selectedOrg.comVel.length() * 100).toFixed(1)} cm/s</span>
               </div>
               <div>
+                <span className="text-slate-400 text-[11px] block">Net / path</span>
+                <span className="font-mono text-cyan-300">{selectedOrg.netTravelMeters.toFixed(2)} / {selectedOrg.totalTravelMeters.toFixed(2)} m</span>
+              </div>
+              <div>
+                <span className="text-slate-400 text-[11px] block">Travel / motor energy</span>
+                <span className="font-mono text-cyan-300">{selectedOrg.netMetersPerMotorUnit.toFixed(4)} m/unit</span>
+              </div>
+              <div>
                 <span className="text-slate-400 text-[11px] block">Mechanical Work</span>
                 <span className="font-mono text-slate-200">{Math.round(selectedOrg.totalWorkJoules)} physical J</span>
               </div>
@@ -440,6 +448,8 @@ export default function App() {
                   <div key={idx} className="flex justify-between items-center text-slate-300 bg-slate-950/50 px-2 py-1 rounded">
                     <span>
                       Joint #{idx + 1} ({j.child.partGene.hingeAxis}-axis)
+                      {j.child.partGene.motorRhythmMix !== undefined &&
+                        <span className="text-violet-300 ml-1">rhythm {Math.round(j.child.partGene.motorRhythmMix * 100)}%</span>}
                       {j.child.partGene.motorStrokeDuty !== undefined &&
                         <span className="text-sky-400 ml-1">power {Math.round(j.child.partGene.motorStrokeDuty * 100)}%</span>}
                       {j.child.partGene.motorFeatherAngle !== undefined &&
