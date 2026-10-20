@@ -1,6 +1,7 @@
 import * as THREE from 'three';
-import { FaceDirection, OrganismGenome, VoxelPartGene, VOXEL_UNIT } from './genome';
-import { RigidCuboid, RevoluteJoint } from './physics';
+import { FaceDirection, OrganismGenome, VoxelPartGene, VOXEL_UNIT, isBroadFace } from './genome';
+import { RigidCuboid, RevoluteJoint, PhysicsWorld, PHYSICS_DT, faceAnchor, faceNormal, axisVector } from './physics';
+import { OBB } from 'three/examples/jsm/math/OBB.js';
 
 export class BrainInstance {
   public hiddenState: Float32Array;
@@ -68,6 +69,48 @@ export interface FeedingEvent {
   energyGained: number;
 }
 
+export function bodyLayout(genome: OrganismGenome, position: THREE.Vector3, rotation: THREE.Quaternion) {
+  if (!genome.parts?.length || genome.parts.length > 10 || genome.parts.filter(p => p.parentId === null).length !== 1)
+    throw new Error('An organism must have exactly one root and 1–10 parts.');
+  if (!position.toArray().every(Number.isFinite) || !rotation.toArray().every(Number.isFinite) || rotation.lengthSq() < .99)
+    throw new Error('Invalid organism transform.');
+  const poses = new Map<string, { gene: VoxelPartGene; pos: THREE.Vector3; rot: THREE.Quaternion; alignment: THREE.Quaternion; box: OBB }>();
+  const ids = new Set<string>();
+  for (const p of genome.parts) {
+    if (ids.has(p.id) || !['X','Y','Z'].includes(p.hingeAxis) || ![p.dimX,p.dimY,p.dimZ].every(n=>Number.isInteger(n)&&n>=1&&n<=5)
+      || ![p.minAngle,p.maxAngle,p.restAngle,p.motorMaxTorque,p.motorFrequency,p.motorPhase].every(Number.isFinite)
+      || p.minAngle > p.maxAngle || p.restAngle < p.minAngle || p.restAngle > p.maxAngle || p.minAngle <= -Math.PI || p.maxAngle >= Math.PI || p.motorMaxTorque < 0 || p.motorFrequency < 0)
+      throw new Error('Invalid physical part: ' + p.id);
+    ids.add(p.id);
+  }
+  let pending = [...genome.parts];
+  while (pending.length) {
+    const next: VoxelPartGene[] = [];
+    for (const p of pending) {
+      if (p.parentId !== null && !poses.has(p.parentId)) { next.push(p); continue; }
+      let pos = position.clone(), rot = rotation.clone().normalize(), alignment = new THREE.Quaternion();
+      if (p.parentId !== null) {
+        if (!p.parentFace || !p.attachFace || !['+X','-X','+Y','-Y','+Z','-Z'].includes(p.parentFace) || !['+X','-X','+Y','-Y','+Z','-Z'].includes(p.attachFace)) throw new Error('Invalid attachment face: '+p.id);
+        const parent = poses.get(p.parentId)!;
+        if(isBroadFace(p.parentFace,parent.gene.dimX,parent.gene.dimY,parent.gene.dimZ)&&isBroadFace(p.attachFace,p.dimX,p.dimY,p.dimZ))
+          throw new Error('Broad-to-broad attachment: '+p.id);
+        alignment.setFromUnitVectors(faceNormal(p.attachFace), faceNormal(p.parentFace).negate());
+        rot = parent.rot.clone().multiply(new THREE.Quaternion().setFromAxisAngle(axisVector(p.hingeAxis), THREE.MathUtils.clamp(p.restAngle,p.minAngle,p.maxAngle))).multiply(alignment).normalize();
+        pos = faceAnchor(p.parentFace,parent.gene).applyQuaternion(parent.rot).add(parent.pos)
+          .sub(faceAnchor(p.attachFace,p).applyQuaternion(rot));
+      }
+      const half = new THREE.Vector3(p.dimX,p.dimY,p.dimZ).multiplyScalar(VOXEL_UNIT/2);
+      const box = new OBB(new THREE.Vector3(),half.clone().addScalar(-1e-5));
+      box.applyMatrix4(new THREE.Matrix4().compose(pos,rot,new THREE.Vector3(1,1,1)));
+      for (const other of poses.values()) if (box.intersectsOBB(other.box)) throw new Error('Overlapping rest anatomy: '+p.id+' / '+other.gene.id);
+      poses.set(p.id,{gene:p,pos,rot,alignment,box});
+    }
+    if (next.length === pending.length) throw new Error('Disconnected or cyclic body tree.');
+    pending = next;
+  }
+  return genome.parts.map(p=>poses.get(p.id)!);
+}
+
 export class OrganismInstance {
   public genome: OrganismGenome;
   public bodies: RigidCuboid[] = [];
@@ -89,188 +132,79 @@ export class OrganismInstance {
   public lastFeedingHighlightSec: Record<string, number> = {};
   public recentFeedingEvents: FeedingEvent[] = [];
 
-  constructor(genome: OrganismGenome, spawnPos: THREE.Vector3, spawnRot: THREE.Quaternion = new THREE.Quaternion()) {
+  readonly physics: PhysicsWorld;
+  private readonly ownsPhysics: boolean;
+  private disposed = false;
+
+  constructor(genome: OrganismGenome, spawnPos: THREE.Vector3, spawnRot = new THREE.Quaternion(), physics?: PhysicsWorld) {
+    const layout = bodyLayout(genome,spawnPos,spawnRot);
     this.genome = genome;
-
-    let totalInputs = 0;
-    let totalOutputs = 0;
-
-    for (let i = 1; i < genome.parts.length; i++) {
-      totalInputs += 2;
-      totalOutputs += 4;
+    this.ownsPhysics = !physics;
+    this.physics = physics ?? new PhysicsWorld();
+    const inputCount = (genome.parts.length-1)*2 + 3 + genome.parts.reduce((n,p)=>n+(p.hasEye?27:0)+(p.hasMouth?1:0)+1,0);
+    this.brain = new BrainInstance(genome.brain,inputCount,Math.max(4,(genome.parts.length-1)*4));
+    for (const pose of layout) this.bodies.push(new RigidCuboid(this.physics,pose.gene,pose.pos,pose.rot));
+    const bodies = new Map(this.bodies.map(b=>[b.id,b]));
+    for (const pose of layout) {
+      const g=pose.gene;
+      if (g.parentId === null) continue;
+      const parent=bodies.get(g.parentId)!, child=bodies.get(g.id)!;
+      this.joints.push(new RevoluteJoint(parent,child,faceAnchor(g.parentFace!,parent.partGene),faceAnchor(g.attachFace!,g),
+        g.hingeAxis,g.minAngle,g.maxAngle,g.restAngle,g.motorMaxTorque,g.motorPhase,pose.alignment));
     }
-    totalInputs += 3;
-
-    for (const p of genome.parts) {
-      if (p.hasEye) totalInputs += 27;
-      if (p.hasMouth) totalInputs += 1;
-    }
-    totalInputs += genome.parts.length;
-
-    this.brain = new BrainInstance(genome.brain, totalInputs, Math.max(4, totalOutputs));
-    this.initPhysicsHierarchy(spawnPos, spawnRot);
-  }
-
-  private getFaceOffset(face: FaceDirection, dimX: number, dimY: number, dimZ: number): THREE.Vector3 {
-    const halfX = (dimX * VOXEL_UNIT) / 2;
-    const halfY = (dimY * VOXEL_UNIT) / 2;
-    const halfZ = (dimZ * VOXEL_UNIT) / 2;
-
-    switch (face) {
-      case '+X': return new THREE.Vector3(halfX, 0, 0);
-      case '-X': return new THREE.Vector3(-halfX, 0, 0);
-      case '+Y': return new THREE.Vector3(0, halfY, 0);
-      case '-Y': return new THREE.Vector3(0, -halfY, 0);
-      case '+Z': return new THREE.Vector3(0, 0, halfZ);
-      case '-Z': return new THREE.Vector3(0, 0, -halfZ);
-      default: return new THREE.Vector3(0, 0, halfZ);
-    }
-  }
-
-  public initPhysicsHierarchy(spawnPos: THREE.Vector3, spawnRot: THREE.Quaternion) {
-    this.bodies = [];
-    this.joints = [];
-    this.mass = 0;
-
-    const partMap = new Map<string, RigidCuboid>();
-
-    // 1. Instantiate Rigid Bodies
-    for (let i = 0; i < this.genome.parts.length; i++) {
-      const g = this.genome.parts[i];
-      const body = new RigidCuboid(g, 1000);
-      this.bodies.push(body);
-      partMap.set(g.id, body);
-      this.mass += body.mass;
-
-      if (i === 0) {
-        body.pos.copy(spawnPos);
-        body.rot.copy(spawnRot).normalize();
-      }
-    }
-
-    // 2. Compute tree placements so anchors coincide at rest:
-    // parentPos + parentRot * parentAnchor = childPos + childRot * childAnchor
-    for (let i = 1; i < this.genome.parts.length; i++) {
-      const g = this.genome.parts[i];
-      const childBody = this.bodies[i];
-      const parentBody = partMap.get(g.parentId || '') || this.bodies[0];
-
-      const pFace = g.parentFace || '+Z';
-      const cFace = g.attachFace || '-Z';
-
-      const parentLocalAnchor = this.getFaceOffset(pFace, parentBody.partGene.dimX, parentBody.partGene.dimY, parentBody.partGene.dimZ);
-      const childLocalAnchor = this.getFaceOffset(cFace, g.dimX, g.dimY, g.dimZ);
-
-      // Child rest rotation
-      const hingeAxis = g.hingeAxis === 'X' ? new THREE.Vector3(1, 0, 0) : g.hingeAxis === 'Y' ? new THREE.Vector3(0, 1, 0) : new THREE.Vector3(0, 0, 1);
-      const restRelRot = new THREE.Quaternion().setFromAxisAngle(hingeAxis, g.restAngle);
-      childBody.rot.copy(parentBody.rot).multiply(restRelRot).normalize();
-
-      // World anchor of parent
-      const parentWorldAnchor = parentLocalAnchor.clone().applyQuaternion(parentBody.rot).add(parentBody.pos);
-      // Position child so childWorldAnchor == parentWorldAnchor
-      const childAnchorRotated = childLocalAnchor.clone().applyQuaternion(childBody.rot);
-      childBody.pos.copy(parentWorldAnchor).sub(childAnchorRotated);
-
-      // Create Revolute Joint
-      const joint = new RevoluteJoint(
-        parentBody,
-        childBody,
-        parentLocalAnchor,
-        childLocalAnchor,
-        g.hingeAxis,
-        g.minAngle,
-        g.maxAngle,
-        g.restAngle,
-        g.motorMaxTorque,
-        g.motorPhase
-      );
-      this.joints.push(joint);
-    }
-
     this.updateCOM();
+  }
+
+  dispose() {
+    if (this.disposed) return;
+    this.disposed = true;
+    if (this.ownsPhysics) this.physics.dispose();
+    else for(const b of this.bodies) b.dispose();
   }
 
   public updateCOM() {
-    this.com.set(0, 0, 0);
-    this.comVel.set(0, 0, 0);
-    let totalMass = 0;
-    for (const b of this.bodies) {
-      if (isNaN(b.pos.x) || isNaN(b.linVel.x)) {
-        this.hasPhysicsError = true;
-        continue;
-      }
-      totalMass += b.mass;
-      this.com.addScaledVector(b.pos, b.mass);
-      this.comVel.addScaledVector(b.linVel, b.mass);
+    this.com.set(0,0,0); this.comVel.set(0,0,0); this.mass=0;
+    for(const b of this.bodies) {
+      const values=[...b.pos.toArray(),...b.rot.toArray(),...b.linVel.toArray(),...b.angVel.toArray()];
+      if(!values.every(Number.isFinite)) { this.hasPhysicsError=true; throw new Error('Non-finite organism: '+this.genome.id); }
+      this.mass+=b.mass; this.com.addScaledVector(b.pos,b.mass); this.comVel.addScaledVector(b.linVel,b.mass);
     }
-    if (totalMass > 0) {
-      this.com.divideScalar(totalMass);
-      this.comVel.divideScalar(totalMass);
-    }
+    this.com.divideScalar(this.mass); this.comVel.divideScalar(this.mass);
   }
 
-  public updatePhysicsSubstep(subDt: number, mu: number) {
-    if (this.isDead || this.hasPhysicsError) return;
-
-    // 1. Update Joint kinematics (angles, relative velocities, anchor errors)
-    for (const joint of this.joints) {
+  preparePhysicsSubstep(subDt: number, mu: number) {
+    if (this.disposed) throw new Error('Organism has been disposed.');
+    if(Math.abs(subDt-PHYSICS_DT)>1e-12) throw new Error('Physics timestep must stay fixed at 1/120 s.');
+    if(this.isDead) return;
+    for(const joint of this.joints) joint.updateJointKinematics();
+    for(const b of this.bodies) b.applyHydrodynamics(mu);
+    if(!Array.from(this.brain.outputs).every(Number.isFinite)) throw new Error('Non-finite neural motor command.');
+    let outIdx=0;
+    for(const joint of this.joints) {
+      const g=joint.child.partGene, outputs=this.brain.outputs;
+      const offset=(outputs[outIdx]||0)*(g.maxAngle-g.minAngle)*.5;
+      const frequency=g.motorFrequency*(1+(outputs[outIdx+1]||0)*.5);
+      const allowance=this.reserves>0&&this.motorsEnabled ? Math.max(0,((outputs[outIdx+2]??0)+1)*.5*g.motorMaxTorque) : 0;
+      const stiffness=Math.max(0,((outputs[outIdx+3]??0)+1)*.5*900);
+      joint.jointPhase=(joint.jointPhase+2*Math.PI*frequency*subDt)%(2*Math.PI);
+      const target=g.restAngle+offset+(g.maxAngle-g.minAngle)*.45*Math.sin(joint.jointPhase);
+      joint.applyMotorAndLimits(target,allowance,stiffness,60);
+      outIdx+=4;
+    }
+  }
+  finishPhysicsSubstep(subDt: number) {
+    if(this.isDead) return;
+    for(const joint of this.joints) {
       joint.updateJointKinematics();
+      const work=joint.motorWork(subDt);
+      this.totalWorkJoules+=work;
+      // Existing chemical conversion retained for this physics-only change; full ledger repair is separate.
+      this.reserves=Math.max(0,this.reserves-work*.005);
     }
-
-    // 2. Apply Hydrodynamics to all bodies
-    for (const body of this.bodies) {
-      body.applyHydrodynamics(mu);
-    }
-
-    // 3. Integrate oscillator phase & Motor drives
-    let outIdx = 0;
-    for (let j = 0; j < this.joints.length; j++) {
-      const joint = this.joints[j];
-      const g = joint.child.partGene;
-
-      // Check available energy: if reserves depleted, motor torque is zero
-      const hasEnergy = this.reserves > 0 && this.motorsEnabled;
-      const neuralOffset = (this.brain.outputs[outIdx] || 0) * (g.maxAngle - g.minAngle) * 0.5;
-      const freqMod = 1.0 + (this.brain.outputs[outIdx + 1] || 0) * 0.5;
-      const instFreq = Math.max(0.05, g.motorFrequency * freqMod);
-      const torqueAllowance = hasEnergy ? Math.max(0, (this.brain.outputs[outIdx + 2] + 1) * 0.5 * g.motorMaxTorque) : 0;
-      const stiffness = Math.max(0.5, (this.brain.outputs[outIdx + 3] + 1) * 0.5 * 25);
-      const damping = 2.0;
-      outIdx += 4;
-
-      // Integrate joint oscillator phase continuously
-      joint.jointPhase = (joint.jointPhase + 2 * Math.PI * instFreq * subDt) % (2 * Math.PI);
-
-      // Target angle = restAngle + neuralOffset + strokeAmp * sin(phase)
-      const strokeAmp = (g.maxAngle - g.minAngle) * 0.45;
-      const oscAngle = strokeAmp * Math.sin(joint.jointPhase);
-      const targetAngle = g.restAngle + neuralOffset + oscAngle;
-
-      const workJoules = joint.applyMotorAndLimits(targetAngle, torqueAllowance, stiffness, damping, subDt);
-      this.totalWorkJoules += workJoules;
-      // Deduct only actual muscular work, ensuring reserves never drop below 0
-      const cost = workJoules * 0.005;
-      this.reserves = Math.max(0, this.reserves - cost);
-    }
-
-    // 4. Integrate Forces and Torques into Velocities
-    for (const body of this.bodies) {
-      body.integrateForces(subDt);
-    }
-
-    // 5. Projected Gauss-Seidel Constraint Solver (Anchors & Limits)
-    for (let iter = 0; iter < 6; iter++) {
-      for (const joint of this.joints) {
-        joint.solveVelocityAndPositionConstraints(subDt);
-      }
-    }
-
-    // 6. Integrate Velocities into Positions & Orientations
-    for (const body of this.bodies) {
-      body.integrateVelocity(subDt);
-    }
-
     this.updateCOM();
+  }
+  public updatePhysicsSubstep(subDt=PHYSICS_DT, mu=250) {
+    if(!this.ownsPhysics) throw new Error('Shared organisms must be stepped by WorldSimulation.');
+    this.preparePhysicsSubstep(subDt,mu); this.physics.step(subDt); this.finishPhysicsSubstep(subDt);
   }
 }

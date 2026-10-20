@@ -1,5 +1,7 @@
 import * as THREE from 'three';
-import { OrganismInstance } from './organism';
+import { OrganismInstance, bodyLayout } from './organism';
+import { PhysicsWorld, DEFAULT_WATER_RESISTANCE } from './physics';
+import { OBB } from 'three/examples/jsm/math/OBB.js';
 import { PRNG } from './prng';
 import { createFounderGenome, mutateGenome } from './mutation';
 import { OrganismGenome, getMouthApertureLocal, isContactingMouthAperture } from './genome';
@@ -48,7 +50,7 @@ export class WorldSimulation {
   public organisms: OrganismInstance[] = [];
   public nutrients: Nutrient[] = [];
   public eggs: Egg[] = [];
-  public tankBounds = new THREE.Vector3(26, 16, 26); // Tank bounds [-13..13, 1..17, -13..13]
+  public tankBounds = new THREE.Vector3(26, 16, 26); // Physical interior: x/z [-13,13], y [1,15].
   public simTime: number = 0;
   public nutrientInflowPerSec: number = 15;
   public targetNutrientCount: number = 400;
@@ -59,7 +61,8 @@ export class WorldSimulation {
   public highestGenerationReached: number = 1;
   public externalEnergyAdded: number = 0;
   public nextIdCounter: number = 100;
-  public waterDragCoeff: number = 3.5;
+  public waterDragCoeff: number = DEFAULT_WATER_RESISTANCE;
+  public physics!: PhysicsWorld;
   public physicsStepCount: number = 0;
   private nutrientAccumulator: number = 0;
 
@@ -69,6 +72,8 @@ export class WorldSimulation {
   }
 
   public reset(initialOrganisms: number = 14) {
+    this.physics?.dispose();
+    this.physics = new PhysicsWorld(this.tankBounds);
     this.organisms = [];
     this.nutrients = [];
     this.eggs = [];
@@ -101,7 +106,13 @@ export class WorldSimulation {
   }
 
   public addOrganism(genome: OrganismGenome, pos: THREE.Vector3, rot: THREE.Quaternion = new THREE.Quaternion()): OrganismInstance {
-    const org = new OrganismInstance(genome, pos, rot);
+    // External insertion can search nearby clear positions; internal hatching never teleports an egg.
+    const offsets=[new THREE.Vector3()];
+    for(const radius of [1.5,3,4.5,6]) for(const axis of [new THREE.Vector3(1,0,0),new THREE.Vector3(0,1,0),new THREE.Vector3(0,0,1)])
+      for(const sign of [-1,1]) offsets.push(axis.clone().multiplyScalar(radius*sign));
+    const place=offsets.map(v=>v.add(pos)).find(p=>this.canSpawn(genome,p,rot));
+    if(!place) throw new Error('No clear space for this organism.');
+    const org = new OrganismInstance(genome, place, rot, this.physics);
     this.organisms.push(org);
     this.externalEnergyAdded += org.reserves + org.structuralEnergy;
     return org;
@@ -124,6 +135,7 @@ export class WorldSimulation {
   }
 
   public stepOuterTick(outerDt: number = 1 / 60) {
+    if(Math.abs(outerDt-1/60)>1e-12) throw new Error('Outer ticks must stay fixed at 1/60 s.');
     this.simTime += outerDt;
 
     // 1. Replenish nutrients if below target
@@ -151,6 +163,7 @@ export class WorldSimulation {
       egg.incubationRemainingSec -= outerDt;
       if (egg.incubationRemainingSec <= 0) {
         if (this.organisms.length < this.maxOrganisms) {
+          if(!this.canSpawn(egg.genome,egg.pos,new THREE.Quaternion())) continue;
           const childOrg = this.addOrganism(egg.genome, egg.pos.clone());
           childOrg.reserves = egg.fundingRemaining;
           this.totalBirths++;
@@ -176,9 +189,10 @@ export class WorldSimulation {
       this.physicsStepCount++;
       for (const org of this.organisms) {
         if (org.isDead) continue;
-        org.updatePhysicsSubstep(subDt, this.waterDragCoeff);
-        this.containInTank(org);
+        org.preparePhysicsSubstep(subDt, this.waterDragCoeff);
       }
+      this.physics.step(subDt);
+      for(const org of this.organisms) org.finishPhysicsSubstep(subDt);
     }
 
     // 5. Feeding, Reproduction, and Life cycles
@@ -225,40 +239,31 @@ export class WorldSimulation {
             energy: 35,
           });
         }
+        org.dispose();
         this.organisms.splice(oIdx, 1);
       }
     }
   }
 
-  private containInTank(org: OrganismInstance) {
-    const halfX = this.tankBounds.x * 0.48;
-    const halfZ = this.tankBounds.z * 0.48;
-    const minY = 1.0;
-    const maxY = this.tankBounds.y - 1.0;
+  public dispose() { this.physics.dispose(); }
 
-    for (const body of org.bodies) {
-      if (body.pos.x < -halfX) {
-        body.pos.x = -halfX;
-        body.linVel.x = Math.abs(body.linVel.x) * 0.5;
-      } else if (body.pos.x > halfX) {
-        body.pos.x = halfX;
-        body.linVel.x = -Math.abs(body.linVel.x) * 0.5;
+  /** Conservative spawn clearance using exact oriented part boxes and full tank extents. */
+  public canSpawn(genome: OrganismGenome, pos: THREE.Vector3, rot = new THREE.Quaternion()): boolean {
+    let layout: ReturnType<typeof bodyLayout>;
+    try { layout=bodyLayout(genome,pos,rot); } catch { return false; }
+    for(const pose of layout) {
+      const half=new THREE.Vector3(pose.gene.dimX,pose.gene.dimY,pose.gene.dimZ).multiplyScalar(.15);
+      for(const x of [-1,1]) for(const y of [-1,1]) for(const z of [-1,1]) {
+        const p=new THREE.Vector3(x*half.x,y*half.y,z*half.z).applyQuaternion(pose.rot).add(pose.pos);
+        if(Math.abs(p.x)>this.tankBounds.x/2 || Math.abs(p.z)>this.tankBounds.z/2 || p.y<1 || p.y>this.tankBounds.y-1) return false;
       }
-      if (body.pos.z < -halfZ) {
-        body.pos.z = -halfZ;
-        body.linVel.z = Math.abs(body.linVel.z) * 0.5;
-      } else if (body.pos.z > halfZ) {
-        body.pos.z = halfZ;
-        body.linVel.z = -Math.abs(body.linVel.z) * 0.5;
-      }
-      if (body.pos.y < minY) {
-        body.pos.y = minY;
-        body.linVel.y = Math.abs(body.linVel.y) * 0.5;
-      } else if (body.pos.y > maxY) {
-        body.pos.y = maxY;
-        body.linVel.y = -Math.abs(body.linVel.y) * 0.5;
+      for(const body of this.physics.bodies) {
+        const box=new OBB(new THREE.Vector3(),new THREE.Vector3(body.dimX,body.dimY,body.dimZ).multiplyScalar(.5));
+        box.applyMatrix4(new THREE.Matrix4().compose(body.pos,body.rot,new THREE.Vector3(1,1,1)));
+        if(pose.box.intersectsOBB(box)) return false;
       }
     }
+    return true;
   }
 
   private populateSensoryInputs(org: OrganismInstance) {

@@ -1,372 +1,158 @@
+import RAPIER from '@dimforge/rapier3d-compat';
 import * as THREE from 'three';
-import { FaceDirection, VoxelPartGene, VOXEL_UNIT } from './genome';
+import { type FaceDirection, type VoxelPartGene, VOXEL_UNIT } from './genome';
 
-// 3x3 Matrix Inversion Helper
-function invertMatrix3(m: number[], out: number[]): boolean {
-  const a00 = m[0], a01 = m[1], a02 = m[2];
-  const a10 = m[3], a11 = m[4], a12 = m[5];
-  const a20 = m[6], a21 = m[7], a22 = m[8];
-
-  const b01 = a22 * a11 - a12 * a21;
-  const b11 = -a22 * a10 + a12 * a20;
-  const b21 = a21 * a10 - a11 * a20;
-
-  const det = a00 * b01 + a01 * b11 + a02 * b21;
-  if (Math.abs(det) < 1e-12) return false;
-
-  const invDet = 1.0 / det;
-
-  out[0] = b01 * invDet;
-  out[1] = (-a22 * a01 + a02 * a21) * invDet;
-  out[2] = (a12 * a01 - a02 * a11) * invDet;
-  out[3] = b11 * invDet;
-  out[4] = (a22 * a00 - a02 * a20) * invDet;
-  out[5] = (-a12 * a00 + a02 * a10) * invDet;
-  out[6] = b21 * invDet;
-  out[7] = (-a21 * a00 + a01 * a20) * invDet;
-  out[8] = (a11 * a00 - a01 * a10) * invDet;
-
-  return true;
+export const PHYSICS_DT = 1 / 120;
+export const BODY_DENSITY = 1000; // kg/m^3; metres, seconds, N, N m throughout physics.
+export const DEFAULT_WATER_RESISTANCE = 250;
+let initialization: Promise<void> | undefined;
+let initialized = false;
+export function initializePhysics(): Promise<void> {
+  return initialization ??= RAPIER.init().then(() => { initialized = true; });
 }
 
+export function faceNormal(face: FaceDirection): THREE.Vector3 {
+  return new THREE.Vector3(face.endsWith('X') ? 1 : 0, face.endsWith('Y') ? 1 : 0, face.endsWith('Z') ? 1 : 0)
+    .multiplyScalar(face.startsWith('-') ? -1 : 1);
+}
+export function faceAnchor(face: FaceDirection, p: VoxelPartGene): THREE.Vector3 {
+  return faceNormal(face).multiply(new THREE.Vector3(p.dimX, p.dimY, p.dimZ)).multiplyScalar(VOXEL_UNIT / 2);
+}
+export function axisVector(axis: 'X' | 'Y' | 'Z'): THREE.Vector3 {
+  return new THREE.Vector3(axis === 'X' ? 1 : 0, axis === 'Y' ? 1 : 0, axis === 'Z' ? 1 : 0);
+}
+
+/** Exactly the existing integrated normal-only resistance law; no swimming thrust. */
+export function cuboidResistance(a: number, b: number, c: number, velocity: THREE.Vector3, omega: THREE.Vector3, mu: number) {
+  return {
+    force: new THREE.Vector3(-2 * mu * b * c * velocity.x, -2 * mu * a * c * velocity.y, -2 * mu * a * b * velocity.z),
+    torque: new THREE.Vector3(-mu * omega.x * a * (b ** 3 + c ** 3) / 6,
+      -mu * omega.y * b * (a ** 3 + c ** 3) / 6, -mu * omega.z * c * (a ** 3 + b ** 3) / 6),
+  };
+}
+
+/** One authoritative Rapier world per ecosystem. Reference organisms can own an isolated world. */
+export class PhysicsWorld {
+  readonly raw: RAPIER.World;
+  readonly bodies = new Set<RigidCuboid>();
+  steps = 0;
+  disposed = false;
+  constructor(readonly bounds?: THREE.Vector3) {
+    if (!initialized) throw new Error('Call initializePhysics() before constructing a simulation.');
+    this.raw = new RAPIER.World({ x: 0, y: 0, z: 0 });
+    this.raw.timestep = PHYSICS_DT;
+    this.raw.numSolverIterations = 12;
+    this.raw.integrationParameters.numInternalPgsIterations = 2;
+    if (bounds) {
+      const hx = bounds.x / 2, hz = bounds.z / 2, middle = bounds.y / 2, hy = middle - 1;
+      const wall = (x: number, y: number, z: number, a: number, b: number, c: number) => {
+        this.raw.createCollider(RAPIER.ColliderDesc.cuboid(a, b, c).setTranslation(x, y, z).setFriction(0).setRestitution(0));
+      };
+      wall(-hx - .25, middle, 0, .25, hy + .5, hz + .5); wall(hx + .25, middle, 0, .25, hy + .5, hz + .5);
+      wall(0, middle, -hz - .25, hx + .5, hy + .5, .25); wall(0, middle, hz + .25, hx + .5, hy + .5, .25);
+      wall(0, .75, 0, hx + .5, .25, hz + .5); wall(0, bounds.y - .75, 0, hx + .5, .25, hz + .5);
+    }
+  }
+  step(dt = PHYSICS_DT) {
+    if (this.disposed) throw new Error('Physics world has been disposed.');
+    if (Math.abs(dt - PHYSICS_DT) > 1e-12) throw new Error('Physics timestep must stay fixed at 1/120 s.');
+    for (const b of this.bodies) b.flushForces();
+    this.raw.step(); this.steps++;
+    for (const b of this.bodies) b.sync();
+  }
+  dispose() { if (!this.disposed) { this.disposed = true; this.bodies.clear(); this.raw.free(); } }
+}
+
+/** Read snapshots for rendering/senses; Rapier alone integrates and owns physical state. */
 export class RigidCuboid {
-  public id: string;
-  public partGene: VoxelPartGene;
-  public dimX: number;
-  public dimY: number;
-  public dimZ: number;
-  public mass: number;
-  public invMass: number;
-  public inertiaLocal: THREE.Vector3;
-  public invInertiaLocal: THREE.Vector3;
-
-  // 6-DOF State
-  public pos: THREE.Vector3 = new THREE.Vector3();
-  public rot: THREE.Quaternion = new THREE.Quaternion();
-  public linVel: THREE.Vector3 = new THREE.Vector3();
-  public angVel: THREE.Vector3 = new THREE.Vector3();
-
-  // Accumulators
-  public forceAcc: THREE.Vector3 = new THREE.Vector3();
-  public torqueAcc: THREE.Vector3 = new THREE.Vector3();
-
-  constructor(gene: VoxelPartGene, density: number = 1000) {
-    this.id = gene.id;
-    this.partGene = gene;
-    this.dimX = gene.dimX * VOXEL_UNIT;
-    this.dimY = gene.dimY * VOXEL_UNIT;
-    this.dimZ = gene.dimZ * VOXEL_UNIT;
-
-    const volume = this.dimX * this.dimY * this.dimZ;
-    this.mass = Math.max(0.05, volume * density);
-    this.invMass = 1.0 / this.mass;
-
-    const ix = (this.mass * (this.dimY * this.dimY + this.dimZ * this.dimZ)) / 12;
-    const iy = (this.mass * (this.dimX * this.dimX + this.dimZ * this.dimZ)) / 12;
-    const iz = (this.mass * (this.dimX * this.dimX + this.dimY * this.dimY)) / 12;
-
-    this.inertiaLocal = new THREE.Vector3(ix, iy, iz);
-    this.invInertiaLocal = new THREE.Vector3(1 / ix, 1 / iy, 1 / iz);
+  readonly id: string;
+  readonly dimX: number; readonly dimY: number; readonly dimZ: number;
+  readonly raw: RAPIER.RigidBody;
+  readonly collider: RAPIER.Collider;
+  readonly pos = new THREE.Vector3(); readonly rot = new THREE.Quaternion();
+  readonly linVel = new THREE.Vector3(); readonly angVel = new THREE.Vector3();
+  readonly forceAcc = new THREE.Vector3(); readonly torqueAcc = new THREE.Vector3();
+  constructor(readonly world: PhysicsWorld, readonly partGene: VoxelPartGene,
+    position = new THREE.Vector3(), rotation = new THREE.Quaternion(), density = BODY_DENSITY) {
+    this.id = partGene.id;
+    this.dimX = partGene.dimX * VOXEL_UNIT; this.dimY = partGene.dimY * VOXEL_UNIT; this.dimZ = partGene.dimZ * VOXEL_UNIT;
+    this.raw = world.raw.createRigidBody(RAPIER.RigidBodyDesc.dynamic().setTranslation(position.x, position.y, position.z)
+      .setRotation(rotation).setCanSleep(false).setCcdEnabled(true).setLinearDamping(0).setAngularDamping(0));
+    this.collider = world.raw.createCollider(RAPIER.ColliderDesc.cuboid(this.dimX / 2, this.dimY / 2, this.dimZ / 2)
+      .setDensity(density).setFriction(0).setRestitution(0), this.raw);
+    this.raw.recomputeMassPropertiesFromColliders();
+    world.bodies.add(this); this.sync();
   }
-
-  public getInertiaTensorWorldInv(outMatrix: THREE.Matrix3): THREE.Matrix3 {
-    const rotMat = new THREE.Matrix4().makeRotationFromQuaternion(this.rot);
-    const el = rotMat.elements;
-    const r00 = el[0], r01 = el[4], r02 = el[8];
-    const r10 = el[1], r11 = el[5], r12 = el[9];
-    const r20 = el[2], r21 = el[6], r22 = el[10];
-
-    const ix = this.invInertiaLocal.x;
-    const iy = this.invInertiaLocal.y;
-    const iz = this.invInertiaLocal.z;
-
-    outMatrix.set(
-      r00 * ix * r00 + r01 * iy * r01 + r02 * iz * r02,
-      r00 * ix * r10 + r01 * iy * r11 + r02 * iz * r12,
-      r00 * ix * r20 + r01 * iy * r21 + r02 * iz * r22,
-
-      r10 * ix * r00 + r11 * iy * r01 + r12 * iz * r02,
-      r10 * ix * r10 + r11 * iy * r11 + r12 * iz * r12,
-      r10 * ix * r20 + r11 * iy * r21 + r12 * iz * r22,
-
-      r20 * ix * r00 + r21 * iy * r01 + r22 * iz * r02,
-      r20 * ix * r10 + r21 * iy * r11 + r22 * iz * r12,
-      r20 * ix * r20 + r21 * iy * r21 + r22 * iz * r22
-    );
-    return outMatrix;
+  get mass() { return this.raw.mass(); }
+  get invMass() { return 1 / this.mass; }
+  get inertiaLocal() { return new THREE.Vector3().copy(this.raw.principalInertia()); }
+  getInertiaTensorWorldInv(out: THREE.Matrix3): THREE.Matrix3 {
+    const m = this.raw.effectiveWorldInvInertia();
+    return out.set(m.m11, m.m12, m.m13, m.m12, m.m22, m.m23, m.m13, m.m23, m.m33);
   }
-
-  public applyHydrodynamics(mu: number) {
-    if (mu <= 0) return;
-    const invRot = this.rot.clone().invert();
-    const localLinVel = this.linVel.clone().applyQuaternion(invRot);
-    const localAngVel = this.angVel.clone().applyQuaternion(invRot);
-
-    const a = this.dimX;
-    const b = this.dimY;
-    const c = this.dimZ;
-
-    const fx = -2 * mu * b * c * localLinVel.x;
-    const fy = -2 * mu * a * c * localLinVel.y;
-    const fz = -2 * mu * a * b * localLinVel.z;
-
-    const tx = (-mu * localAngVel.x * a * (b * b * b + c * c * c)) / 6;
-    const ty = (-mu * localAngVel.y * b * (a * a * a + c * c * c)) / 6;
-    const tz = (-mu * localAngVel.z * c * (a * a * a + b * b * b)) / 6;
-
-    const worldForce = new THREE.Vector3(fx, fy, fz).applyQuaternion(this.rot);
-    const worldTorque = new THREE.Vector3(tx, ty, tz).applyQuaternion(this.rot);
-
-    this.forceAcc.add(worldForce);
-    this.torqueAcc.add(worldTorque);
+  sync() { this.pos.copy(this.raw.translation()); this.rot.copy(this.raw.rotation()); this.linVel.copy(this.raw.linvel()); this.angVel.copy(this.raw.angvel()); }
+  setVelocities(linear: THREE.Vector3, angular = new THREE.Vector3()) { this.raw.setLinvel(linear, true); this.raw.setAngvel(angular, true); this.sync(); }
+  applyHydrodynamics(mu: number) {
+    if (!Number.isFinite(mu) || mu < 0) throw new Error('Water resistance must be finite and nonnegative.');
+    const inverse = this.rot.clone().invert();
+    const drag = cuboidResistance(this.dimX, this.dimY, this.dimZ, this.linVel.clone().applyQuaternion(inverse), this.angVel.clone().applyQuaternion(inverse), mu);
+    this.forceAcc.add(drag.force.applyQuaternion(this.rot)); this.torqueAcc.add(drag.torque.applyQuaternion(this.rot));
   }
-
-  public integrateForces(dt: number) {
-    this.linVel.addScaledVector(this.forceAcc, this.invMass * dt);
-
-    if (this.torqueAcc.lengthSq() > 1e-12) {
-      const invIWorld = new THREE.Matrix3();
-      this.getInertiaTensorWorldInv(invIWorld);
-      const deltaW = this.torqueAcc.clone().applyMatrix3(invIWorld).multiplyScalar(dt);
-      this.angVel.add(deltaW);
-    }
-
-    // Velocity clamp sanity safeguard against numerical runaway
-    const maxSpeed = 15.0;
-    if (this.linVel.lengthSq() > maxSpeed * maxSpeed) {
-      this.linVel.normalize().multiplyScalar(maxSpeed);
-    }
-    const maxAngSpeed = 30.0;
-    if (this.angVel.lengthSq() > maxAngSpeed * maxAngSpeed) {
-      this.angVel.normalize().multiplyScalar(maxAngSpeed);
-    }
-
-    this.forceAcc.set(0, 0, 0);
-    this.torqueAcc.set(0, 0, 0);
+  flushForces() {
+    const values = [...this.pos.toArray(), ...this.rot.toArray(), ...this.linVel.toArray(), ...this.angVel.toArray(), ...this.forceAcc.toArray(), ...this.torqueAcc.toArray()];
+    if (!values.every(Number.isFinite)) throw new Error(`Non-finite body state: ${this.id}`);
+    // Rapier user forces persist until reset. Clear every substep, including zero-drag/motor-off steps.
+    this.raw.resetForces(false); this.raw.resetTorques(false);
+    this.raw.addForce(this.forceAcc, true); this.raw.addTorque(this.torqueAcc, true);
+    this.forceAcc.set(0, 0, 0); this.torqueAcc.set(0, 0, 0);
   }
-
-  public integrateVelocity(dt: number) {
-    this.pos.addScaledVector(this.linVel, dt);
-
-    const wLen = this.angVel.length();
-    if (wLen > 1e-8) {
-      const axis = this.angVel.clone().normalize();
-      const angle = wLen * dt;
-      const deltaQ = new THREE.Quaternion().setFromAxisAngle(axis, angle);
-      this.rot.premultiply(deltaQ).normalize();
-    }
-  }
+  dispose() { if (!this.world.disposed) { this.world.bodies.delete(this); this.world.raw.removeRigidBody(this.raw); } }
 }
 
 export class RevoluteJoint {
-  public parent: RigidCuboid;
-  public child: RigidCuboid;
-  public parentLocalAnchor: THREE.Vector3;
-  public childLocalAnchor: THREE.Vector3;
-  public parentLocalHingeAxis: THREE.Vector3;
-  public childLocalHingeAxis: THREE.Vector3;
-  public minAngle: number;
-  public maxAngle: number;
-  public restAngle: number;
-  public motorMaxTorque: number;
-  public currentAngle: number = 0;
-  public currentRelAngularVel: number = 0;
-  public anchorError: number = 0;
-  public jointPhase: number = 0;
-
-  constructor(
-    parent: RigidCuboid,
-    child: RigidCuboid,
-    parentAnchor: THREE.Vector3,
-    childAnchor: THREE.Vector3,
-    hingeAxis: 'X' | 'Y' | 'Z',
-    minAngle: number,
-    maxAngle: number,
-    restAngle: number,
-    motorMaxTorque: number,
-    initialPhase: number
-  ) {
-    this.parent = parent;
-    this.child = child;
-    this.parentLocalAnchor = parentAnchor.clone();
-    this.childLocalAnchor = childAnchor.clone();
-
-    const axis = hingeAxis === 'X' ? new THREE.Vector3(1, 0, 0) : hingeAxis === 'Y' ? new THREE.Vector3(0, 1, 0) : new THREE.Vector3(0, 0, 1);
-    this.parentLocalHingeAxis = axis.clone();
-    this.childLocalHingeAxis = axis.clone();
-
-    this.minAngle = minAngle;
-    this.maxAngle = maxAngle;
-    this.restAngle = restAngle;
-    this.motorMaxTorque = motorMaxTorque;
-    this.jointPhase = initialPhase;
+  readonly raw: RAPIER.RevoluteImpulseJoint;
+  readonly parentLocalHingeAxis: THREE.Vector3;
+  readonly childLocalHingeAxis: THREE.Vector3;
+  readonly frame1: THREE.Quaternion;
+  readonly frame2: THREE.Quaternion;
+  currentAngle = 0; currentRelAngularVel = 0; anchorError = 0; axisError = 0;
+  jointPhase = 0; appliedTorque = 0; targetAngle = 0;
+  private omegaBefore = 0;
+  constructor(readonly parent: RigidCuboid, readonly child: RigidCuboid,
+    readonly parentLocalAnchor: THREE.Vector3, readonly childLocalAnchor: THREE.Vector3,
+    axis: 'X' | 'Y' | 'Z', readonly minAngle: number, readonly maxAngle: number,
+    readonly restAngle: number, readonly motorMaxTorque: number, initialPhase: number,
+    faceAlignment = new THREE.Quaternion()) {
+    this.parentLocalHingeAxis = axisVector(axis);
+    this.childLocalHingeAxis = this.parentLocalHingeAxis.clone().applyQuaternion(faceAlignment.clone().invert());
+    this.frame1 = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(1, 0, 0), this.parentLocalHingeAxis);
+    this.frame2 = faceAlignment.clone().invert().multiply(this.frame1);
+    const data = RAPIER.JointData.revolute(parentLocalAnchor, childLocalAnchor, this.parentLocalHingeAxis);
+    this.raw = parent.world.raw.createImpulseJoint(data, parent.raw, child.raw, true) as RAPIER.RevoluteImpulseJoint;
+    this.raw.setLocalFrame1(parentLocalAnchor, this.frame1); this.raw.setLocalFrame2(childLocalAnchor, this.frame2);
+    this.raw.setLimits(minAngle, maxAngle); this.raw.setContactsEnabled(false);
+    this.jointPhase = initialPhase; this.updateJointKinematics();
   }
-
-  public getWorldHingeAxis(): THREE.Vector3 {
-    return this.parentLocalHingeAxis.clone().applyQuaternion(this.parent.rot).normalize();
+  getWorldHingeAxis() { return this.parentLocalHingeAxis.clone().applyQuaternion(this.parent.rot); }
+  updateJointKinematics() {
+    const p = this.parentLocalAnchor.clone().applyQuaternion(this.parent.rot).add(this.parent.pos);
+    const c = this.childLocalAnchor.clone().applyQuaternion(this.child.rot).add(this.child.pos);
+    this.anchorError = p.distanceTo(c);
+    const hinge = this.getWorldHingeAxis();
+    this.axisError = hinge.angleTo(this.childLocalHingeAxis.clone().applyQuaternion(this.child.rot));
+    const a = this.parent.rot.clone().multiply(this.frame1), b = this.child.rot.clone().multiply(this.frame2);
+    const relative = a.invert().multiply(b).normalize();
+    this.currentAngle = THREE.MathUtils.euclideanModulo(2 * Math.atan2(relative.x, relative.w) + Math.PI, 2 * Math.PI) - Math.PI;
+    this.currentRelAngularVel = this.child.angVel.clone().sub(this.parent.angVel).dot(hinge);
   }
-
-  public updateJointKinematics() {
-    const pWorldAnchor = this.parentLocalAnchor.clone().applyQuaternion(this.parent.rot).add(this.parent.pos);
-    const cWorldAnchor = this.childLocalAnchor.clone().applyQuaternion(this.child.rot).add(this.child.pos);
-    this.anchorError = pWorldAnchor.distanceTo(cWorldAnchor);
-
-    const hingeWorld = this.getWorldHingeAxis();
-    const relRot = this.child.rot.clone().premultiply(this.parent.rot.clone().invert());
-    const euler = new THREE.Euler().setFromQuaternion(relRot, 'YXZ');
-    if (this.child.partGene.hingeAxis === 'X') this.currentAngle = euler.x;
-    else if (this.child.partGene.hingeAxis === 'Y') this.currentAngle = euler.y;
-    else this.currentAngle = euler.z;
-
-    const relAngVel = this.child.angVel.clone().sub(this.parent.angVel);
-    this.currentRelAngularVel = relAngVel.dot(hingeWorld);
+  applyMotorAndLimits(targetAngle: number, torqueAllowance: number, stiffness: number, damping: number) {
+    this.targetAngle = THREE.MathUtils.clamp(targetAngle, this.minAngle, this.maxAngle);
+    this.omegaBefore = this.currentRelAngularVel;
+    this.appliedTorque = torqueAllowance <= 0 ? 0 : THREE.MathUtils.clamp(
+      (this.targetAngle - this.currentAngle) * stiffness - damping * this.currentRelAngularVel, -torqueAllowance, torqueAllowance);
+    const torque = this.getWorldHingeAxis().multiplyScalar(this.appliedTorque);
+    this.child.torqueAcc.add(torque); this.parent.torqueAcc.sub(torque);
   }
-
-  public applyMotorAndLimits(targetAngle: number, torqueAllowance: number, stiffness: number, damping: number, dt: number): number {
-    if (torqueAllowance <= 0) return 0;
-
-    const clampedTarget = THREE.MathUtils.clamp(targetAngle, this.minAngle, this.maxAngle);
-    const angleError = clampedTarget - this.currentAngle;
-    const hingeAxisWorld = this.getWorldHingeAxis();
-
-    let desiredTorque = angleError * stiffness - this.currentRelAngularVel * damping;
-    desiredTorque = THREE.MathUtils.clamp(desiredTorque, -torqueAllowance, torqueAllowance);
-
-    if (Math.abs(desiredTorque) > 1e-6) {
-      const torqueVector = hingeAxisWorld.clone().multiplyScalar(desiredTorque);
-      this.child.torqueAcc.add(torqueVector);
-      this.parent.torqueAcc.sub(torqueVector);
-    }
-
-    // Active mechanical muscular work only (no passive constraint noise)
-    return Math.abs(desiredTorque * this.currentRelAngularVel * dt);
-  }
-
-  public solveVelocityAndPositionConstraints(dt: number) {
-    // 1. Point-to-Point Coincident Anchor Constraint with Full 3x3 Effective Mass Matrix K
-    const r1 = this.parentLocalAnchor.clone().applyQuaternion(this.parent.rot);
-    const r2 = this.childLocalAnchor.clone().applyQuaternion(this.child.rot);
-    const p1 = this.parent.pos.clone().add(r1);
-    const p2 = this.child.pos.clone().add(r2);
-    const posError = p2.clone().sub(p1);
-    this.anchorError = posError.length();
-
-    // Relative anchor velocity: v_rel = (v2 + w2 x r2) - (v1 + w1 x r1)
-    const v1 = this.parent.linVel.clone().add(this.parent.angVel.clone().cross(r1));
-    const v2 = this.child.linVel.clone().add(this.child.angVel.clone().cross(r2));
-    const vRel = v2.sub(v1);
-
-    // Baumgarte stabilization term
-    const beta = 0.15;
-    const bias = posError.clone().multiplyScalar(beta / dt);
-    const targetDeltaV = vRel.clone().add(bias).negate();
-
-    // Construct full 3x3 K matrix: K = (1/m1 + 1/m2)*I - [r1_x] I1_inv [r1_x] - [r2_x] I2_inv [r2_x]
-    const invI1 = new THREE.Matrix3();
-    const invI2 = new THREE.Matrix3();
-    this.parent.getInertiaTensorWorldInv(invI1);
-    this.child.getInertiaTensorWorldInv(invI2);
-
-    const m1_inv = this.parent.invMass;
-    const m2_inv = this.child.invMass;
-
-    // Helper: compute C = S * invI * S^T where S is the skew-symmetric cross-product matrix of r.
-    // In Three.js, invI.elements is stored in column-major order:
-    // [i00, i10, i20, i01, i11, i21, i02, i12, i22].
-    // The returned array `out` is a 9-element 3x3 matrix in row-major order:
-    // [C00, C01, C02, C10, C11, C12, C20, C21, C22].
-    const computeRotInertiaContribution = (r: THREE.Vector3, invI: THREE.Matrix3, out: number[]) => {
-      const el = invI.elements;
-      const i00 = el[0], i10 = el[1], i20 = el[2];
-      const i01 = el[3], i11 = el[4], i21 = el[5];
-      const i02 = el[6], i12 = el[7], i22 = el[8];
-
-      // S = [r_x]
-      // Step 1: M = S * invI
-      const m00 = -r.z * i10 + r.y * i20;
-      const m01 = -r.z * i11 + r.y * i21;
-      const m02 = -r.z * i12 + r.y * i22;
-
-      const m10 = r.z * i00 - r.x * i20;
-      const m11 = r.z * i01 - r.x * i21;
-      const m12 = r.z * i02 - r.x * i22;
-
-      const m20 = -r.y * i00 + r.x * i10;
-      const m21 = -r.y * i01 + r.x * i11;
-      const m22 = -r.y * i02 + r.x * i12;
-
-      // Step 2: C = M * S^T
-      out[0] = -m01 * r.z + m02 * r.y;
-      out[1] = m00 * r.z - m02 * r.x;
-      out[2] = -m00 * r.y + m01 * r.x;
-
-      out[3] = -m11 * r.z + m12 * r.y;
-      out[4] = m10 * r.z - m12 * r.x;
-      out[5] = -m10 * r.y + m11 * r.x;
-
-      out[6] = -m21 * r.z + m22 * r.y;
-      out[7] = m20 * r.z - m22 * r.x;
-      out[8] = -m20 * r.y + m21 * r.x;
-    };
-
-    const c1 = [0,0,0, 0,0,0, 0,0,0];
-    const c2 = [0,0,0, 0,0,0, 0,0,0];
-    computeRotInertiaContribution(r1, invI1, c1);
-    computeRotInertiaContribution(r2, invI2, c2);
-
-    const K = [
-      m1_inv + m2_inv + c1[0] + c2[0], c1[1] + c2[1], c1[2] + c2[2],
-      c1[3] + c2[3], m1_inv + m2_inv + c1[4] + c2[4], c1[5] + c2[5],
-      c1[6] + c2[6], c1[7] + c2[7], m1_inv + m2_inv + c1[8] + c2[8]
-    ];
-
-    const invK = [0,0,0, 0,0,0, 0,0,0];
-    if (invertMatrix3(K, invK)) {
-      const impulse = new THREE.Vector3(
-        invK[0]*targetDeltaV.x + invK[1]*targetDeltaV.y + invK[2]*targetDeltaV.z,
-        invK[3]*targetDeltaV.x + invK[4]*targetDeltaV.y + invK[5]*targetDeltaV.z,
-        invK[6]*targetDeltaV.x + invK[7]*targetDeltaV.y + invK[8]*targetDeltaV.z
-      );
-
-      // Clamp impulse for extreme stability
-      const maxImpulse = 200.0;
-      if (impulse.lengthSq() > maxImpulse * maxImpulse) {
-        impulse.normalize().multiplyScalar(maxImpulse);
-      }
-
-      this.child.linVel.addScaledVector(impulse, m2_inv);
-      this.parent.linVel.addScaledVector(impulse, -m1_inv);
-
-      const torque2 = r2.clone().cross(impulse);
-      const torque1 = r1.clone().cross(impulse.clone().negate());
-
-      this.child.angVel.add(torque2.applyMatrix3(invI2));
-      this.parent.angVel.add(torque1.applyMatrix3(invI1));
-    }
-
-    // 2. Angular Limit Enforcement along Hinge Axis
-    const hingeWorld = this.getWorldHingeAxis();
-    let limitImpulse = 0;
-    if (this.currentAngle < this.minAngle) {
-      const error = this.minAngle - this.currentAngle;
-      const relW = this.child.angVel.clone().sub(this.parent.angVel).dot(hingeWorld);
-      const K_ang = hingeWorld.clone().applyMatrix3(invI1).dot(hingeWorld) + hingeWorld.clone().applyMatrix3(invI2).dot(hingeWorld);
-      if (K_ang > 1e-6) {
-        limitImpulse = Math.max(0, (error * (0.2 / dt) - relW) / K_ang);
-      }
-    } else if (this.currentAngle > this.maxAngle) {
-      const error = this.maxAngle - this.currentAngle;
-      const relW = this.child.angVel.clone().sub(this.parent.angVel).dot(hingeWorld);
-      const K_ang = hingeWorld.clone().applyMatrix3(invI1).dot(hingeWorld) + hingeWorld.clone().applyMatrix3(invI2).dot(hingeWorld);
-      if (K_ang > 1e-6) {
-        limitImpulse = Math.min(0, (error * (0.2 / dt) - relW) / K_ang);
-      }
-    }
-
-    if (Math.abs(limitImpulse) > 1e-6) {
-      const angImpulseVec = hingeWorld.clone().multiplyScalar(limitImpulse);
-      this.child.angVel.add(angImpulseVec.clone().applyMatrix3(invI2));
-      this.parent.angVel.sub(angImpulseVec.clone().applyMatrix3(invI1));
-    }
-  }
+  /** Trapezoidal actual relative angular displacement; never charge passive constraint impulses. */
+  motorWork(dt: number) { return Math.abs(this.appliedTorque * (this.omegaBefore + this.currentRelAngularVel) * .5 * dt); }
 }
