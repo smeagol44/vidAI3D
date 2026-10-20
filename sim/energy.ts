@@ -11,7 +11,7 @@ import type { OrganismGenome } from './genome';
  * assertion about real biochemical tissue density.
  */
 export function constructionEnergy(genome: OrganismGenome): number {
-  const voxels = genome.parts.reduce((n, p) => n + p.dimX * p.dimY * p.dimZ, 0);
+  const voxels = genome.parts.reduce((n, p) => n + p.dimX * p.dimY * p.dimZ * (p.thicknessScaleY ?? 1), 0);
   const mouths = genome.parts.filter(p => p.hasMouth).length;
   const eyes = genome.parts.filter(p => p.hasEye).length;
   const joints = genome.parts.filter(p => p.parentId !== null).length;
