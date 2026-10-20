@@ -87,7 +87,7 @@ test('living full-ecosystem physical power/recovery candidates: signed progress 
  for(const duty of [.25,.35,.5,.65,.75])
   for(const feather of [-1.2,-.6,.6,1.2])
    options.push({duty,feather,width:2,legacy:false});
- const records=[];
+ const records: {duty:number;feather:number;width:number;legacy:boolean;net:number;forward:number;lateral:number;path:number;energy:number;travelPerEnergy:number;remain:number;motorWork:number;maxGap:number;residual:number}[]=[];
  for(const p of options){
   const sim=new WorldSimulation(4242,0);
   try{
