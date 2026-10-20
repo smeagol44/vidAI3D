@@ -113,6 +113,12 @@ export function scanAudioBoundaries(buffer: AudioBuffer): AudioBoundaries {
         targetIndex < totalSamples &&
         targetIndex < i + marginSamples + 256
       ) {
+        // Do not chase a zero crossing into long silent MP3 padding.
+        // Once consecutive samples are quiet, the requested safety margin is enough.
+        if (
+          Math.abs(channels[0][targetIndex]) <= SILENCE_THRESHOLD_AMPLITUDE &&
+          Math.abs(channels[0][targetIndex - 1]) <= SILENCE_THRESHOLD_AMPLITUDE
+        ) break;
         if (channels[0][targetIndex] >= 0 && channels[0][targetIndex - 1] < 0) {
           break;
         }
