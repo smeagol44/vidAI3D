@@ -22,6 +22,21 @@ The organism inspector reports **net COM displacement** (distance from original 
 
 These measurements start on each organism's actual construction/hatching. They are not inherited and are not persisted as a new genome schema field. Distance alone does **not** establish navigation toward food, predator avoidance, course-holding or population fitness.
 
+### Reproducible sustained-swimming evaluation (development only)
+
+Run `npm run benchmark:locomotion -- --seed 4242 --seconds 8` for current planar, nonplanar serpent and fin-tail founders, each with identical DNA examined under two starting yaw orientations (0 and π). This creates independent **production** physical worlds, one organism per trial, with 0 nutrients, 0 nutrient inflow, no egg funding, unmodified recurrent brain outputs, and normal motor charges.
+
+The JSON report separates:
+- **Final net distance** from **total COM path**, and **peak radius** from the original COM: swaying, circling and early distance peaks should not be called sustained swimming.
+- **First-half and second-half net movement** and late-window path straightness: exposes animals that move only initially or spend time circling.
+- Signed progress along the original body-facing `-Z` axis (positive/negative, both perfectly valid outcomes), and real final-root heading deflection.
+- Charged **motor-only chemical cost** and metres per motor-energy unit, separate from ordinary basal upkeep; measures physical hinge-anchor error and world energy-conservation residual.
+
+The same routine supports a physically disabled-motors reference and a **counterfactual genotype** in which every physical joint's inherited `motorRhythmMix` is zero. The tested default founder genotypes expose a significant current limitation: in seed 4242 isolated eight-second swims, planar and nonplanar serpent founders travel net **1.462 m** and **1.090 m** respectively, but almost entirely in the direction *opposite* their root mouth/eye-facing −Z axis. Fin-tail travels **0.452 m** net with **+0.229 m** of forward signed progress. All have paid motor costs and nonzero second-half travel. These are controlled measurements of real morphology and brain outputs, not ecosystem pursuit or successful feeding.
+
+The tests do **not** choose reproductive winners, influence mutation probabilities, set environmental targets, or assert that a trial's fastest configuration is ecologically beneficial. Different environments, a real food-reaching test and selection through funded reproduction are later work.
+
+
 ## Limits
 
 Existing planar, serpent and fin-tail founders still use their old (rhythmic) motor settings. New direct-control genotypes need an evolved neural signal that varies appropriately in time; the ability to disable rhythm **does not automatically make the default creatures faster**. Normal-only drag, real motor work and energy conversion are unchanged. Long-run ecology and more useful swimming selection remain future work.
