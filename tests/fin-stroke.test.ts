@@ -22,7 +22,7 @@ test('legacy stroke remains sinusoidal; power/recovery asymmetry is smooth and b
   assert.ok(recoveryFeatherWeight(0)<.01);
   assert.ok(recoveryFeatherWeight(Math.PI)>.99);
   assert.ok(recoveryFeatherWeight(2*Math.PI)<.01);
-  assert.ok(Math.abs(strokeWave(Math.PI/2,.3)-1)<1e-10);
+  assert.ok(Math.abs(strokeWave(2*Math.PI*(.3-.25),.3)-1)<1e-10);
   assert.ok(Math.abs(strokeWave(3*Math.PI/2,.7)+1)<1e-10);
 });
 
