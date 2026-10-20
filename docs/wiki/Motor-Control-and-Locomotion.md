@@ -32,7 +32,9 @@ The JSON report separates:
 - Signed progress along the original body-facing `-Z` axis (positive/negative, both perfectly valid outcomes), and real final-root heading deflection.
 - Charged **motor-only chemical cost** and metres per motor-energy unit, separate from ordinary basal upkeep; measures physical hinge-anchor error and world energy-conservation residual.
 
-The same routine supports a physically disabled-motors reference and a **counterfactual genotype** in which every physical joint's inherited `motorRhythmMix` is zero. The tests do **not** choose reproductive winners, influence mutation probabilities, set environmental targets, or assert that a trial's fastest configuration is ecologically beneficial. Different environments, a real food-reaching test and selection through funded reproduction are later work.
+The same routine supports a physically disabled-motors reference and a **counterfactual genotype** in which every physical joint's inherited `motorRhythmMix` is zero. The tested default founder genotypes expose a significant current limitation: in seed 4242 isolated eight-second swims, planar and nonplanar serpent founders travel net **1.462 m** and **1.090 m** respectively, but almost entirely in the direction *opposite* their root mouth/eye-facing −Z axis. Fin-tail travels **0.452 m** net with **+0.229 m** of forward signed progress. All have paid motor costs and nonzero second-half travel. These are controlled measurements of real morphology and brain outputs, not ecosystem pursuit or successful feeding.
+
+The tests do **not** choose reproductive winners, influence mutation probabilities, set environmental targets, or assert that a trial's fastest configuration is ecologically beneficial. Different environments, a real food-reaching test and selection through funded reproduction are later work.
 
 
 ## Limits
