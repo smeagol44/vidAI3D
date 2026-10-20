@@ -1,5 +1,7 @@
 # Physics foundation, v0.2.0
 
+> **Historical foundation baseline:** the calibrated physical-only measurements below remain the v0.2.0 references. The subsequent live-brain phase-coordination and mutable founder-prior repair is documented in [PROJECT_STATUS.md](PROJECT_STATUS.md) and [live-locomotion-results-0.2.1.json](live-locomotion-results-0.2.1.json); it does not redefine or erase the original isolated reference evidence.
+
 Rapier 0.21.0 replaces the custom rigid-body integrator and constraint solver. Every part, including the root, is dynamic in one shared ecosystem world. Rapier owns poses and velocities; rendering and senses read snapshots. Physics uses metres, seconds, kilograms, newtons and newton-metres, with zero gravity and initially still water.
 
 Both attachment faces determine the rest orientation and coincident anchors. Separate local hinge frames preserve the same world axis even when attachment faces differ. Rest geometry is validated before construction. Physical joints enforce anchors and limits. Only adjacent connected-body contacts are disabled; other bodies and all six walls participate in contacts. CCD is enabled, though the tests do not establish universal collision robustness for every possible evolved anatomy.
