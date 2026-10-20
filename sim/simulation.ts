@@ -4,7 +4,7 @@ import { PhysicsWorld, DEFAULT_WATER_RESISTANCE } from './physics';
 import { OBB } from 'three/examples/jsm/math/OBB.js';
 import { PRNG } from './prng';
 import { createFounderGenome, mutateGenome } from './mutation';
-import { OrganismGenome, getMouthApertureLocal, isContactingMouthAperture } from './genome';
+import { OrganismGenome, getMouthApertureLocal, isContactingMouthAperture, partPhysicalSize } from './genome';
 import { basalUpkeepPerSecond, constructionEnergy, viableEggFunding } from './energy';
 
 export interface Nutrient {
@@ -330,7 +330,7 @@ export class WorldSimulation {
     let layout: ReturnType<typeof bodyLayout>;
     try { layout=bodyLayout(genome,pos,rot); } catch { return false; }
     for(const pose of layout) {
-      const half=new THREE.Vector3(pose.gene.dimX,pose.gene.dimY,pose.gene.dimZ).multiplyScalar(.15);
+      const half=new THREE.Vector3(...partPhysicalSize(pose.gene)).multiplyScalar(.5);
       for(const x of [-1,1]) for(const y of [-1,1]) for(const z of [-1,1]) {
         const p=new THREE.Vector3(x*half.x,y*half.y,z*half.z).applyQuaternion(pose.rot).add(pose.pos);
         if(Math.abs(p.x)>this.tankBounds.x/2 || Math.abs(p.z)>this.tankBounds.z/2 || p.y<1 || p.y>this.tankBounds.y-1) return false;
@@ -453,7 +453,7 @@ export class WorldSimulation {
 
       const diet = body.partGene.mouthDiet || 'herbivore';
       const face = body.partGene.mouthFace || '-Z';
-      const ap = getMouthApertureLocal(face, body.partGene.dimX, body.partGene.dimY, body.partGene.dimZ);
+      const ap = getMouthApertureLocal(face, body.partGene.dimX, body.partGene.dimY, body.partGene.dimZ, body.partGene.thicknessScaleY);
       const mouthWorldPos = ap.localPos.clone().applyQuaternion(body.rot).add(body.pos);
       const mouthWorldNormal = ap.localNormal.clone().applyQuaternion(body.rot).normalize();
       const mouthRadius = ap.radius;
