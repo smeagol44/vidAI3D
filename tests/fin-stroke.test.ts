@@ -139,6 +139,9 @@ test('living full-ecosystem feather orientation / duty: true physical signed tra
 test('same-size old and feathered blades over twenty simulated seconds',()=>{
  const run=(feathered:boolean)=>{
   const s=new WorldSimulation(4242,0);
+  // A controlled gait comparison must not include newly affordable egg funding
+  // in the measured locomotor chemical cost.
+  s.maxOrganisms=1;
   try{
    s.clearFreeNutrients();s.targetNutrientCount=0;s.nutrientInflowPerSec=0;
    const g=fins(.5,0,4,!feathered);
