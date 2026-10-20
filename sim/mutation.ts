@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { OrganismGenome, VoxelPartGene, NeuralGene, FaceDirection, isBroadFace, VOXEL_UNIT, validateGenome } from './genome';
 import { PRNG } from './prng';
+import { viableEggFunding } from './energy';
 
 export function createFounderGenome(id: string, name: string, prng: PRNG, type: 'planar_swimmer' | '3d_serpent' | 'tri_limb'): OrganismGenome {
   const parts: VoxelPartGene[] = [];
@@ -258,7 +259,7 @@ export function createFounderGenome(id: string, name: string, prng: PRNG, type: 
     outputBiases,
   };
 
-  return {
+  const founder: OrganismGenome = {
     id,
     name,
     generation: 1,
@@ -275,6 +276,10 @@ export function createFounderGenome(id: string, name: string, prng: PRNG, type: 
       lifespanSec: 160,
     },
   };
+  // Founders inherit enough egg funding to construct their *actual* anatomy
+  // and leave a meaningful reserve; do not retrofit imported genomes.
+  founder.metabolism.eggEnergyFunding = Math.max(140, Math.ceil(viableEggFunding(founder)));
+  return founder;
 }
 
 export function mutateGenome(parent: OrganismGenome, prng: PRNG, newId: string): OrganismGenome {
