@@ -458,7 +458,7 @@ export class WorldSimulation {
         for (let i = this.nutrients.length - 1; i >= 0; i--) {
           const nut = this.nutrients[i];
           if (isContactingMouthAperture(mouthWorldPos, mouthWorldNormal, mouthRadius, nut.pos, 0.25)) {
-            const intake = Math.min(nut.energy, maxIntake);
+            const intake = Math.min(nut.energy, maxIntake, Math.max(0, org.reserveCapacity - org.reserves));
               if (intake > 0) {
                 nut.energy -= intake;
                 org.reserves += intake;
@@ -474,7 +474,9 @@ export class WorldSimulation {
                 });
                 if (org.recentFeedingEvents.length > 8) org.recentFeedingEvents.pop();
 
-                if (nut.energy <= 0.01) {
+                if (nut.energy <= 1e-9) {
+                  // Retain numerical slivers as explicitly accounted chemical heat.
+                  this.chemicalHeat += Math.max(0, nut.energy);
                   this.nutrients.splice(i, 1);
                 }
               }
@@ -493,10 +495,11 @@ export class WorldSimulation {
           const egg = this.eggs[i];
           if (egg.parentId !== org.genome.id) {
             if (isContactingMouthAperture(mouthWorldPos, mouthWorldNormal, mouthRadius, egg.pos, 0.35)) {
-              const intake = Math.min(egg.fundingRemaining, maxIntake);
+              const intake = Math.min(egg.fundingRemaining, maxIntake, Math.max(0, org.reserveCapacity - org.reserves) / TROPHIC_EFFICIENCY);
               if (intake > 0) {
                 egg.fundingRemaining -= intake; // Deduct from egg FIRST
                 const gained = intake * TROPHIC_EFFICIENCY;
+                this.chemicalHeat += intake - gained;
                 org.reserves += gained;
                 org.totalFoodEaten += gained;
                 this.totalFoodConsumed += gained;
@@ -510,7 +513,8 @@ export class WorldSimulation {
                 });
                 if (org.recentFeedingEvents.length > 8) org.recentFeedingEvents.pop();
 
-                if (egg.fundingRemaining <= 0.01) {
+                if (egg.fundingRemaining <= 1e-9) {
+                  this.chemicalHeat += Math.max(0, egg.fundingRemaining);
                   this.eggs.splice(i, 1);
                 }
               }
@@ -539,10 +543,11 @@ export class WorldSimulation {
           }
 
           if (contacted) {
-            const intake = Math.min(prey.reserves, maxIntake);
+            const intake = Math.min(prey.reserves, maxIntake, Math.max(0, org.reserveCapacity - org.reserves) / TROPHIC_EFFICIENCY);
             if (intake > 0) {
               prey.reserves -= intake; // Subtract from prey FIRST
               const gained = intake * TROPHIC_EFFICIENCY;
+              this.chemicalHeat += intake - gained;
               org.reserves += gained; // Credit predator after losses
               org.totalFoodEaten += gained;
               this.totalFoodConsumed += gained;
@@ -566,15 +571,13 @@ export class WorldSimulation {
   public getTelemetry(renderFps: number = 60, measuredStepsPerSec: number = 120, achievedSpeed: number = 1.0): EcosystemTelemetry {
     let orgReserves = 0;
     let orgTissue = 0;
-    let dissipatedWork = 0;
-    let totalAnchorError = 0;
+     let totalAnchorError = 0;
     let jointCount = 0;
 
     for (const o of this.organisms) {
       orgReserves += Math.max(0, o.reserves);
       orgTissue += o.structuralEnergy;
-      dissipatedWork += o.totalWorkJoules;
-      for (const j of o.joints) {
+       for (const j of o.joints) {
         totalAnchorError += j.anchorError;
         jointCount++;
       }
@@ -601,11 +604,15 @@ export class WorldSimulation {
       averageAnchorError: jointCount > 0 ? totalAnchorError / jointCount : 0,
       chemicalEnergyLedger: {
         totalInput: this.externalEnergyAdded,
-        organismReserves: Math.round(orgReserves),
-        organismTissue: Math.round(orgTissue),
-        eggEnergy: Math.round(eggEnergy),
-        nutrientEnergy: Math.round(nutEnergy),
-        dissipatedMetabolicWork: Math.round(dissipatedWork),
+        organismReserves: orgReserves,
+        organismTissue: orgTissue,
+        eggEnergy,
+        nutrientEnergy: nutEnergy,
+        dissipatedMetabolicWork: this.chemicalHeat,
+        mechanicalWorkJoules: this.cumulativeMechanicalWorkJoules,
+        externalRemovals: this.externalEnergyRemoved,
+        conservationResidual: this.externalEnergyAdded - this.externalEnergyRemoved -
+          (orgReserves + orgTissue + eggEnergy + nutEnergy + this.chemicalHeat),
       },
     };
   }
