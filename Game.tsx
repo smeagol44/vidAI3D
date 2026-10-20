@@ -66,25 +66,6 @@ function AquariumEnvironment({ bounds }: { bounds: THREE.Vector3 }) {
         ))
       )}
 
-      {/* Gentle Floating Water Motes */}
-      <points>
-        <bufferGeometry>
-          <bufferAttribute
-            attach="attributes-position"
-            args={[
-              new Float32Array(
-                Array.from({ length: 180 }, () => [
-                  (Math.random() - 0.5) * bounds.x,
-                  Math.random() * bounds.y,
-                  (Math.random() - 0.5) * bounds.z,
-                ]).flat()
-              ),
-              3,
-            ]}
-          />
-        </bufferGeometry>
-        <pointsMaterial color="#38bdf8" size={0.12} transparent opacity={0.6} />
-      </points>
     </group>
   );
 }
