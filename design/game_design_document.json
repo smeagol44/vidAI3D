@@ -1,0 +1,98 @@
+{
+  "title": "Vida 3D",
+  "hook": "Evolve articulated aquatic voxel organisms",
+  "game_overview": "An open-ended 3D artificial-life aquatic sandbox where articulated neural voxel organisms swim, sense colors, feed, and evolve in physical water.",
+  "artstyle": "low-poly",
+  "genre": "casual3d",
+  "winning_condition": "Open-ended observation of emergent evolutionary adaptations and swimming mechanics.",
+  "losing_condition": "Extinction can occur naturally; simulation remains open for exploration, inspection, and manual seed additions without forced reseeding.",
+  "player_mode": "single_player",
+  "supported_orientations": [
+    "landscape",
+    "portrait",
+    "wide"
+  ],
+  "input_methods": [
+    "mouse",
+    "touch",
+    "keyboard"
+  ],
+  "score_options": {
+    "score_type": "points",
+    "score_order": "higher_is_better"
+  },
+  "low_end_device_support": false,
+  "mobile_playable": true,
+  "language": [
+    "en"
+  ],
+  "content_descriptors": [],
+  "controls": [
+    {
+      "input": "Left Mouse Drag / Single Touch Drag",
+      "action": "Orbit observation camera around the 3D aquarium."
+    },
+    {
+      "input": "Right Mouse Drag / Two-finger Touch Drag",
+      "action": "Pan observation camera focus point in 3D space."
+    },
+    {
+      "input": "Mouse Scroll / Pinch Gesture",
+      "action": "Zoom camera in and out of the aquarium."
+    },
+    {
+      "input": "Left Click / Tap on Organism",
+      "action": "Select organism to inspect brain, anatomy, telemetry, and enable follow camera."
+    },
+    {
+      "input": "Spacebar / Play Button",
+      "action": "Toggle simulation pause / play."
+    },
+    {
+      "input": "N Key / Populate Button",
+      "action": "Spawn founder organisms or refill nutrients to target capacity."
+    }
+  ],
+  "sections": [
+    {
+      "title": "Design Pillars",
+      "content": "1. Physically Authoritative Hydrodynamics: Normal-only linear surface resistance and 3D revolute joints drive swimming kinematics. 2. True RGB Occluding Ray Vision: Eyes cast 3D multi-ray grids sensing actual surface colors and spatial occlusion. 3. Continuous Recurrent Neuromechanics: Leaky integrator recurrent neural networks translating sensory inputs into bounded joint motor torques. 4. Conservative Energy Conservation: Strict auditable ledger tracking reserves, construction costs, funded reproduction, predation, and metabolic dissipation.",
+      "summary": "Core foundational pillars of VIDA 3D artificial life simulation."
+    },
+    {
+      "title": "Core Loop",
+      "content": "Founders spawn in a submerged 3D voxel aquarium. Organisms fire recurrent neural networks to coordinate revolute joints against water resistance, navigate toward emerald nutrients or prey, ingest food via physical mouth apertures, store energy reserves, and lay funded eggs. Eggs incubate and hatch mutated offspring with altered morphology, motor pathways, and neural weights. The player observes, inspects neural activations and telemetry, tunes environmental parameters, and curates specimens.",
+      "summary": "The evolutionary and observation cycle."
+    },
+    {
+      "title": "3D Camera & Movement Alignment",
+      "content": "Coordinate Convention: Three.js right-handed coordinate system (+Y is Up, +X is Right, -Z is Forward). Organisms freely translate and rotate across all 3 spatial dimensions in zero-gravity still water. The camera supports continuous 3D orbiting, panning, distance zoom, preset orthogonal viewpoints (Top, Front, Side), and a smooth damping Follow Mode locked to the active selected creature.",
+      "summary": "3D coordinate systems, orbit/follow camera perspectives, and continuous 3D physics."
+    },
+    {
+      "title": "3D Scene & Environment Structure",
+      "content": "The simulation takes place inside a bounded 3D aquarium featuring a voxel seabed, subtle cyan-blue water fog, corner depth frames, and suspended cubic emerald nutrients. Interactive entities feature vibrant inherited pigmentation, distinct mouth apertures, block-built eggs, and directional eye cones. All UI panels and telemetry overlays reside in safe zones with glassmorphic semi-transparent styling.",
+      "summary": "Voxel aquarium chamber with depth cues, subtle fog, and emerald nutrients."
+    },
+    {
+      "title": "Anatomy & Joint Kinematics",
+      "content": "Organisms comprise up to 7 integer cuboid parts connected via single-axis physical revolute joints with configurable limits and rest angles. Connections attach to local faces (+X, -X, +Y, -Y, +Z, -Z) adhering to the 3D broad-to-broad prohibition rule. Joint motors operate under a 4-channel controller regulating target angle offset, frequency modulation, torque allowance, and stiffness.",
+      "summary": "Rooted cuboid tree anatomy with revolute joints and 3D attachment rules."
+    },
+    {
+      "title": "Neural Controller & Vision Perception",
+      "content": "Organism brains utilize 24 founder recurrent neurons with leaky integration. Sensory inputs include 3x3 RGB ray vision samples (nearest occluding 3D surface color), joint angles, angular velocities, physical contact sensors, normalized energy reserves, and internal oscillator signals. Brain inspector UI visualizes real-time neuron activations, synaptic weights, and connection thresholds.",
+      "summary": "Continuous-time recurrent neural network and multi-ray RGB eye cones."
+    },
+    {
+      "title": "Metabolism & Ecological Ledger",
+      "content": "The ecosystem tracks all chemical energy across tissue, reserves, eggs, nutrients, and dissipated metabolic work. Ingestion occurs strictly when food contacts physical mouth apertures. Reproduction requires full parental funding for egg construction and starting reserves. Damaged eggs hatch with proportional viability. Dead organisms decompose into recoverable nutrients.",
+      "summary": "Closed chemical energy ledger, funded reproduction, and life cycles."
+    },
+    {
+      "title": "Virtual Touch Controls Implementation",
+      "content": "On mobile devices, touch gestures provide smooth single-finger orbit, two-finger pan, and pinch-zoom. Floating action buttons provide quick access to Pause, Speed adjustments, Nutrient spawning, View presets, and Specimen inspector toggles with touch-none CSS to prevent unwanted scrolling.",
+      "summary": "Mobile touch camera navigation and inspector overlays."
+    }
+  ]
+}
