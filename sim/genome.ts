@@ -137,7 +137,7 @@ export function getMouthApertureLocal(
       localEuler.set(0, Math.PI, 0);
       plateWidth = dimX * VOXEL_UNIT * 0.6;
       plateHeight = physicalY * VOXEL_UNIT * 0.5;
-      radius = Math.max(0.3, Math.min(dimX, dimY) * VOXEL_UNIT * 0.5 + 0.15);
+      radius = Math.max(0.3, Math.min(dimX, physicalY) * VOXEL_UNIT * 0.5 + 0.15);
       break;
     case '-Z':
     default:
@@ -146,7 +146,7 @@ export function getMouthApertureLocal(
       localEuler.set(0, 0, 0);
       plateWidth = dimX * VOXEL_UNIT * 0.6;
       plateHeight = physicalY * VOXEL_UNIT * 0.5;
-      radius = Math.max(0.3, Math.min(dimX, dimY) * VOXEL_UNIT * 0.5 + 0.15);
+      radius = Math.max(0.3, Math.min(dimX, physicalY) * VOXEL_UNIT * 0.5 + 0.15);
       break;
   }
 
