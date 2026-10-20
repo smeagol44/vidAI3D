@@ -82,17 +82,26 @@ test('power stroke and recovery pitch are genetically inherited and can mutate',
  }
 });
 
-test('living full-ecosystem physical power/recovery candidates: signed progress and net/energy',()=>{
- const options=[{duty:.5,feather:0,width:2,legacy:true}];
- for(const duty of [.25,.35,.5,.65,.75])
-  for(const feather of [-1.2,-.6,.6,1.2])
-   options.push({duty,feather,width:2,legacy:false});
- const records: {duty:number;feather:number;width:number;legacy:boolean;net:number;forward:number;lateral:number;path:number;energy:number;travelPerEnergy:number;remain:number;motorWork:number;maxGap:number;residual:number}[]=[];
+test('living full-ecosystem feather orientation / duty: true physical signed travel and net per energy',()=>{
+ const options=[{duty:.5,pitch:0,width:2,legacy:true}];
+ for(const duty of [.25,.5,.75])
+ for(const pitch of [-1.35,-.75,0,.75,1.35])
+ for(const width of [2,4])
+   options.push({duty,pitch,width,legacy:false});
+ const records: {duty:number;pitch:number;width:number;legacy:boolean;net:number;forward:number;lateral:number;path:number;energy:number;travelPerEnergy:number;remain:number;motorWork:number;maxGap:number;residual:number}[]=[];
  for(const p of options){
   const sim=new WorldSimulation(4242,0);
   try{
    sim.clearFreeNutrients();sim.targetNutrientCount=0;sim.nutrientInflowPerSec=0;
-   const o=sim.addOrganism(fins(p.duty,p.feather,p.width,p.legacy),new THREE.Vector3(0,8,0));
+   const genome=fins(p.duty,0,p.width,p.legacy);
+   if(!p.legacy){
+     const leftPlate=genome.parts[2],rightPlate=genome.parts[4];
+     // Face-on broad plate on the power sweep; return to the thin edge
+     // on recovery. Sign mirrored across the body.
+     leftPlate.restAngle=p.pitch;rightPlate.restAngle=-p.pitch;
+     leftPlate.motorFeatherAngle=-p.pitch;rightPlate.motorFeatherAngle=p.pitch;
+   }
+   const o=sim.addOrganism(genome,new THREE.Vector3(0,8,0));
    const start=o.com.clone(),previous=start.clone(),startingEnergy=o.reserves;
    let path=0,maxGap=0;
    for(let n=0;n<600;n++){
@@ -105,9 +114,14 @@ test('living full-ecosystem physical power/recovery candidates: signed progress 
     energy,travelPerEnergy:energy>0?net/energy:0,remain:o.reserves,
     motorWork:o.totalWorkJoules,maxGap,
     residual:sim.getTelemetry().chemicalEnergyLedger.conservationResidual});
+  }catch(error){
+    console.log('FEATHER_ORIENTATION_INVALID',JSON.stringify({p,error:String(error)}));
+    throw error;
   }finally{sim.dispose();}
  }
- console.log('POWER_RECOVERY_GAIT_EVIDENCE',JSON.stringify(records));
+ const ranked=[...records].sort((a,b)=>b.forward-a.forward);
+ console.log('POWER_RECOVERY_GAIT_EVIDENCE',JSON.stringify({baseline:records[0],best:ranked.slice(0,15),
+   worst:ranked.slice(-5),cases:records.length}));
  assert.ok(records.every(r=>Number.isFinite(r.net)&&r.path>=r.net&&r.energy>0&&r.maxGap<.005
   &&Math.abs(r.residual)<1e-5&&r.remain>0));
 });
