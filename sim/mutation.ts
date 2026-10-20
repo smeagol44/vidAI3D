@@ -361,11 +361,25 @@ export function mutateGenome(parent: OrganismGenome, prng: PRNG, newId: string):
       hasEye: false,
     };
     child.parts.push(newPart);
+    // A six-link swimmer can grow a seventh part (six motors). Give the new
+    // motor four genuine neural output pathways rather than silently leaving
+    // the new hinge fixed at neutral output beyond the original 20 channels.
+    const requiredOutputs = (child.parts.length - 1) * 4;
+    while (child.brain.outputWeights.length < requiredOutputs) {
+      child.brain.outputBiases.push(prng.range(-0.01, 0.01));
+      child.brain.outputWeights.push(Array.from({length: child.brain.hiddenCount},
+        () => prng.next() < 0.2 ? prng.range(-0.06, 0.06) : 0));
+    }
   } else if (prng.next() < 0.05 && child.parts.length > 2) {
     // Remove a leaf part
     const leafIndex = child.parts.findIndex((pt, idx) => idx > 0 && !child.parts.some((other) => other.parentId === pt.id));
     if (leafIndex > 0) {
       child.parts.splice(leafIndex, 1);
+      // Joint motor channels are ordered by non-root parts. When a leaf is
+      // removed, discard its four channels so later joint outputs remain
+      // associated with their original body part.
+      child.brain.outputWeights.splice((leafIndex - 1) * 4, 4);
+      child.brain.outputBiases.splice((leafIndex - 1) * 4, 4);
     }
   }
 
