@@ -1,6 +1,6 @@
 import RAPIER from '@dimforge/rapier3d-compat';
 import * as THREE from 'three';
-import { type FaceDirection, type VoxelPartGene, VOXEL_UNIT } from './genome';
+import { type FaceDirection, type VoxelPartGene, partPhysicalSize } from './genome';
 
 export const PHYSICS_DT = 1 / 120;
 export const BODY_DENSITY = 1000; // kg/m^3; metres, seconds, N, N m throughout physics.
@@ -16,7 +16,7 @@ export function faceNormal(face: FaceDirection): THREE.Vector3 {
     .multiplyScalar(face.startsWith('-') ? -1 : 1);
 }
 export function faceAnchor(face: FaceDirection, p: VoxelPartGene): THREE.Vector3 {
-  return faceNormal(face).multiply(new THREE.Vector3(p.dimX, p.dimY, p.dimZ)).multiplyScalar(VOXEL_UNIT / 2);
+  return faceNormal(face).multiply(new THREE.Vector3(...partPhysicalSize(p))).multiplyScalar(0.5);
 }
 export function axisVector(axis: 'X' | 'Y' | 'Z'): THREE.Vector3 {
   return new THREE.Vector3(axis === 'X' ? 1 : 0, axis === 'Y' ? 1 : 0, axis === 'Z' ? 1 : 0);
@@ -75,7 +75,7 @@ export class RigidCuboid {
   constructor(readonly world: PhysicsWorld, readonly partGene: VoxelPartGene,
     position = new THREE.Vector3(), rotation = new THREE.Quaternion(), density = BODY_DENSITY) {
     this.id = partGene.id;
-    this.dimX = partGene.dimX * VOXEL_UNIT; this.dimY = partGene.dimY * VOXEL_UNIT; this.dimZ = partGene.dimZ * VOXEL_UNIT;
+    [this.dimX, this.dimY, this.dimZ] = partPhysicalSize(partGene);
     this.raw = world.raw.createRigidBody(RAPIER.RigidBodyDesc.dynamic().setTranslation(position.x, position.y, position.z)
       .setRotation(rotation).setCanSleep(false).setCcdEnabled(true).setLinearDamping(0).setAngularDamping(0));
     this.collider = world.raw.createCollider(RAPIER.ColliderDesc.cuboid(this.dimX / 2, this.dimY / 2, this.dimZ / 2)
