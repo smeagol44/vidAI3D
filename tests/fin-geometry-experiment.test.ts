@@ -15,9 +15,9 @@ function run(cfg:Gait,seconds=7){
   root.dimY=1;
   const left={...originalLeft,dimX:1,dimY:cfg.span,dimZ:cfg.chord,hingeAxis:cfg.axis,motorPhase:0,motorMaxTorque:cfg.torque};
   const right={...originalRight,dimX:1,dimY:cfg.span,dimZ:cfg.chord,hingeAxis:cfg.axis,motorPhase:Math.PI*cfg.rightBasePhase,motorMaxTorque:cfg.torque};
-  const leftTip={...left,id:'part-3',parentId:left.id,parentFace:'+X' as const,attachFace:'-X' as const,
+  const leftTip={...left,id:'part-3',parentId:left.id,parentFace:'+Z' as const,attachFace:'-Z' as const,
     motorPhase:Math.PI*cfg.phaseLag,hasMouth:false,hasEye:false};
-  const rightTip={...right,id:'part-4',parentId:right.id,parentFace:'-X' as const,attachFace:'+X' as const,
+  const rightTip={...right,id:'part-4',parentId:right.id,parentFace:'+Z' as const,attachFace:'-Z' as const,
     motorPhase:Math.PI*(cfg.rightBasePhase+cfg.rightPhaseSign*cfg.phaseLag),hasMouth:false,hasEye:false};
   g.parts=[root,left,leftTip,right,rightTip];
   const o=s.addOrganism(g,new THREE.Vector3(0,8,0)),start=o.com.clone(),reserve=o.reserves;
@@ -41,7 +41,7 @@ test('diagnostic: two hinged thin broad fins and asymmetric traveling phases',()
  for(const rightBasePhase of [0,.5,1,1.5])
  for(const rightPhaseSign of [-1,1])
   measurements.push(run({axis,span,chord,phaseLag,rightBasePhase,rightPhaseSign,torque:800}));
- const good=measurements.filter(x=> 'forward' in x && x.alive && Number.isFinite(x.forward));
+ const good=measurements.filter((x):x is ReturnType<typeof run> & {forward:number;net:number;alive:boolean} => typeof x.forward==='number' && x.alive===true && Number.isFinite(x.forward));
  console.log('MULTIJOINT_FIN_SWEEP',JSON.stringify({
   candidates:measurements.length,valid:good.length,
   topForward:good.sort((a,b)=>b.forward-a.forward).slice(0,30),
