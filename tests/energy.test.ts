@@ -6,6 +6,7 @@ import { WorldSimulation } from '../sim/simulation';
 import { createFounderGenome } from '../sim/mutation';
 import { constructionEnergy, reserveCapacity, founderReserve, viableEggFunding } from '../sim/energy';
 import { PRNG } from '../sim/prng';
+import { getMouthApertureLocal } from '../sim/genome';
 
 await initializePhysics();
 const genome = (type: 'planar_swimmer' | '3d_serpent' | 'tri_limb' = 'planar_swimmer') =>
@@ -123,5 +124,61 @@ test('explicit feeding respects reserve capacity and external removal stays bala
     s.stepOuterTick();
     assert.ok(org.reserves <= org.reserveCapacity);
     balanced(s, 'motor/upkeep heat');
+  } finally { s.dispose(); }
+});
+
+test('herbivore feeding transfers nutrient chemical energy with no unexplained creation', () => {
+  const s = new WorldSimulation(123,0);
+  try {
+    s.clearFreeNutrients();s.nutrientInflowPerSec=0;s.targetNutrientCount=0;
+    const org=s.addOrganism(genome(),new THREE.Vector3(0,8,0));org.motorsEnabled=false;
+    s.seedNutrients(1);
+    const root=org.bodies[0], ap=getMouthApertureLocal('-Z',root.partGene.dimX,root.partGene.dimY,root.partGene.dimZ);
+    s.nutrients[0].pos.copy(ap.localPos).addScaledVector(ap.localNormal,.1).applyQuaternion(root.rot).add(root.pos);
+    balanced(s,'before nutrient meal');
+    s.stepOuterTick();
+    assert.ok(org.totalFoodEaten > 0,'mouth must absorb accessible nutrient');
+    assert.ok(s.nutrients[0].energy < 40);
+    assert.ok(org.reserves <= org.reserveCapacity);
+    balanced(s,'after nutrient meal');
+  } finally { s.dispose(); }
+});
+
+test('egg predation accounts for the exact trophic loss and remaining egg funding', () => {
+  const s=new WorldSimulation(123,0);
+  try {
+    s.clearFreeNutrients();s.nutrientInflowPerSec=0;s.targetNutrientCount=0;
+    const parentGenome=genome();parentGenome.metabolism.reproduceCooldownSec=.1;parentGenome.metabolism.reproduceReserveThreshold=300;
+    const parent=s.addOrganism(parentGenome,new THREE.Vector3(6,8,0));
+    const predator=s.addOrganism(genome('3d_serpent'),new THREE.Vector3(0,8,0));
+    parent.ageSec=1;
+    s.feedAllOrganisms(250);
+    s.stepOuterTick();
+    assert.equal(s.eggs.length,1);
+    const egg=s.eggs[0];
+    const root=predator.bodies[0],ap=getMouthApertureLocal('-Z',root.partGene.dimX,root.partGene.dimY,root.partGene.dimZ);
+    egg.pos.copy(ap.localPos).addScaledVector(ap.localNormal,.1).applyQuaternion(root.rot).add(root.pos);
+    const before=egg.fundingRemaining;
+    s.stepOuterTick();
+    assert.ok(egg.fundingRemaining<before, 'carnivore/omnivore must transfer egg energy');
+    assert.ok(predator.totalFoodEaten>0);
+    balanced(s,'after egg bite');
+  } finally { s.dispose(); }
+});
+
+test('predation conserves prey reserve and credits 20% trophic loss to heat', () => {
+  const s=new WorldSimulation(123,0);
+  try {
+    s.clearFreeNutrients();s.nutrientInflowPerSec=0;s.targetNutrientCount=0;
+    const predator=s.addOrganism(genome('3d_serpent'),new THREE.Vector3(0,8,0));
+    const preyGenome=genome();preyGenome.parts=preyGenome.parts.slice(0,1);
+    const prey=s.addOrganism(preyGenome,new THREE.Vector3(0,8,-1));
+    predator.motorsEnabled=false;prey.motorsEnabled=false;
+    const before=prey.reserves, beforeHeat=s.chemicalHeat;
+    s.stepOuterTick();
+    assert.ok(predator.totalFoodEaten>0,'prey body should touch forward-facing mouth');
+    assert.ok(prey.reserves<before);
+    assert.ok(s.chemicalHeat>beforeHeat);
+    balanced(s,'after prey bite');
   } finally { s.dispose(); }
 });
