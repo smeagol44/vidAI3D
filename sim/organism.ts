@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { FaceDirection, OrganismGenome, VoxelPartGene, VOXEL_UNIT, isBroadFace } from './genome';
 import { RigidCuboid, RevoluteJoint, PhysicsWorld, PHYSICS_DT, faceAnchor, faceNormal, axisVector } from './physics';
 import { OBB } from 'three/examples/jsm/math/OBB.js';
+import { constructionEnergy, founderReserve, reserveCapacity, CHEMICAL_UNITS_PER_MOTOR_JOULE } from './energy';
 
 export class BrainInstance {
   public hiddenState: Float32Array;
@@ -116,8 +117,10 @@ export class OrganismInstance {
   public bodies: RigidCuboid[] = [];
   public joints: RevoluteJoint[] = [];
   public brain: BrainInstance;
-  public reserves: number = 250;
-  public structuralEnergy: number = 100;
+  public reserves: number;
+  public structuralEnergy: number;
+  public reserveCapacity: number;
+  public totalMotorChemicalSpent: number = 0;
   public ageSec: number = 0;
   public isDead: boolean = false;
   public lastReproduceSec: number = 0;
@@ -139,6 +142,9 @@ export class OrganismInstance {
   constructor(genome: OrganismGenome, spawnPos: THREE.Vector3, spawnRot = new THREE.Quaternion(), physics?: PhysicsWorld) {
     const layout = bodyLayout(genome,spawnPos,spawnRot);
     this.genome = genome;
+    this.structuralEnergy = constructionEnergy(genome);
+    this.reserveCapacity = reserveCapacity(genome);
+    this.reserves = founderReserve(genome);
     this.ownsPhysics = !physics;
     this.physics = physics ?? new PhysicsWorld();
     const inputCount = (genome.parts.length-1)*2 + 3 + genome.parts.reduce((n,p)=>n+(p.hasEye?27:0)+(p.hasMouth?1:0)+1,0);
@@ -212,7 +218,9 @@ export class OrganismInstance {
       const work=joint.motorWork(subDt);
       this.totalWorkJoules+=work;
       // Existing chemical conversion retained for this physics-only change; full ledger repair is separate.
-      this.reserves=Math.max(0,this.reserves-work*.005);
+      const spent = Math.min(Math.max(0, this.reserves), work * CHEMICAL_UNITS_PER_MOTOR_JOULE);
+      this.reserves -= spent;
+      this.totalMotorChemicalSpent += spent;
     }
     this.updateCOM();
   }

@@ -5,6 +5,7 @@ import { OBB } from 'three/examples/jsm/math/OBB.js';
 import { PRNG } from './prng';
 import { createFounderGenome, mutateGenome } from './mutation';
 import { OrganismGenome, getMouthApertureLocal, isContactingMouthAperture } from './genome';
+import { basalUpkeepPerSecond, constructionEnergy, viableEggFunding } from './energy';
 
 export interface Nutrient {
   id: string;
@@ -20,6 +21,7 @@ export interface Egg {
   fundingRemaining: number;
   initialFunding: number;
   incubationRemainingSec: number;
+  rotation?: [number, number, number, number];
 }
 
 export interface EcosystemTelemetry {
@@ -41,7 +43,10 @@ export interface EcosystemTelemetry {
     organismTissue: number;
     eggEnergy: number;
     nutrientEnergy: number;
-    dissipatedMetabolicWork: number;
+    dissipatedMetabolicWork: number; // retained UI field: chemical heat, not mechanical joules
+    mechanicalWorkJoules: number;
+    externalRemovals: number;
+    conservationResidual: number;
   };
 }
 
@@ -60,6 +65,9 @@ export class WorldSimulation {
   public totalFoodConsumed: number = 0;
   public highestGenerationReached: number = 1;
   public externalEnergyAdded: number = 0;
+  public externalEnergyRemoved: number = 0;
+  public chemicalHeat: number = 0;
+  public cumulativeMechanicalWorkJoules: number = 0;
   public nextIdCounter: number = 100;
   public waterDragCoeff: number = DEFAULT_WATER_RESISTANCE;
   public physics!: PhysicsWorld;
@@ -83,6 +91,10 @@ export class WorldSimulation {
     this.totalFoodConsumed = 0;
     this.highestGenerationReached = 1;
     this.externalEnergyAdded = 0;
+    this.externalEnergyRemoved = 0;
+    this.chemicalHeat = 0;
+    this.cumulativeMechanicalWorkJoules = 0;
+    this.nextIdCounter = 100;
     this.nutrientAccumulator = 0;
     this.physicsStepCount = 0;
 
@@ -112,10 +124,49 @@ export class WorldSimulation {
       for(const sign of [-1,1]) offsets.push(axis.clone().multiplyScalar(radius*sign));
     const place=offsets.map(v=>v.add(pos)).find(p=>this.canSpawn(genome,p,rot));
     if(!place) throw new Error('No clear space for this organism.');
-    const org = new OrganismInstance(genome, place, rot, this.physics);
-    this.organisms.push(org);
+    const org = this.constructOrganism(genome, place, rot);
     this.externalEnergyAdded += org.reserves + org.structuralEnergy;
     return org;
+  }
+
+  /** Internal construction does not count parent-funded births as external input. */
+  private constructOrganism(genome: OrganismGenome, pos: THREE.Vector3, rot: THREE.Quaternion) {
+    if (this.organisms.length >= this.maxOrganisms) throw new Error('Organism population limit reached.');
+    const org = new OrganismInstance(genome, pos, rot, this.physics);
+    this.organisms.push(org);
+    return org;
+  }
+
+  /** Explicit user intervention; credits exactly the energy actually delivered. */
+  public feedAllOrganisms(amount: number): number {
+    if (!Number.isFinite(amount) || amount < 0) throw new Error('Invalid external feeding amount.');
+    let added = 0;
+    for (const org of this.organisms) {
+      if (org.isDead) continue;
+      const gain = Math.min(amount, Math.max(0, org.reserveCapacity - org.reserves));
+      org.reserves += gain;
+      added += gain;
+    }
+    this.externalEnergyAdded += added;
+    return added;
+  }
+
+  public reproductionBlockReason(org: OrganismInstance): string | null {
+    if (org.isDead || org.reserves <= 0) return 'Not alive';
+    if (this.organisms.length + this.eggs.length >= this.maxOrganisms) return 'Population limit';
+    if (org.ageSec - org.lastReproduceSec <= org.genome.metabolism.reproduceCooldownSec) return 'Reproduction cooldown';
+    if (org.reserves <= org.genome.metabolism.reproduceReserveThreshold) return 'Below reproduction threshold';
+    const funding = Math.max(org.genome.metabolism.eggEnergyFunding, viableEggFunding(org.genome));
+    if (org.reserves - funding < Math.max(50, org.structuralEnergy * .25)) return 'Insufficient reserve after egg funding';
+    return null;
+  }
+
+  /** Discard free nutrients explicitly as an external sink, never silently. */
+  public clearFreeNutrients(): number {
+    const removed = this.nutrients.reduce((sum, nutrient) => sum + nutrient.energy, 0);
+    this.nutrients = [];
+    this.externalEnergyRemoved += removed;
+    return removed;
   }
 
   public seedNutrients(count: number) {
@@ -162,14 +213,25 @@ export class WorldSimulation {
       const egg = this.eggs[i];
       egg.incubationRemainingSec -= outerDt;
       if (egg.incubationRemainingSec <= 0) {
-        if (this.organisms.length < this.maxOrganisms) {
-          if(!this.canSpawn(egg.genome,egg.pos,new THREE.Quaternion())) continue;
-          const childOrg = this.addOrganism(egg.genome, egg.pos.clone());
-          childOrg.reserves = egg.fundingRemaining;
-          this.totalBirths++;
-          this.highestGenerationReached = Math.max(this.highestGenerationReached, egg.genome.generation);
+        const tissue = constructionEnergy(egg.genome);
+        // A consumed/damaged egg cannot create unfunded tissue; transfer every
+        // remaining unit into edible remains instead.
+        if (egg.fundingRemaining < tissue + 1) {
+          if (egg.fundingRemaining > 0) this.nutrients.push({
+            id: `nut-${this.nextIdCounter++}`, pos: egg.pos.clone(), energy: egg.fundingRemaining
+          });
           this.eggs.splice(i, 1);
+          continue;
         }
+        if (this.organisms.length >= this.maxOrganisms) continue;
+        const rot = egg.rotation ? new THREE.Quaternion().fromArray(egg.rotation) : new THREE.Quaternion();
+        if (!this.canSpawn(egg.genome, egg.pos, rot)) continue;
+        const child = this.constructOrganism(egg.genome, egg.pos.clone(), rot);
+        child.reserves = egg.fundingRemaining - child.structuralEnergy;
+        // Egg funding was already deducted from the parent; no external grant.
+        this.totalBirths++;
+        this.highestGenerationReached = Math.max(this.highestGenerationReached, egg.genome.generation);
+        this.eggs.splice(i, 1);
       }
     }
 
@@ -177,7 +239,9 @@ export class WorldSimulation {
     for (const org of this.organisms) {
       if (org.isDead) continue;
       org.ageSec += outerDt;
-      org.reserves -= org.genome.metabolism.baseUpkeepPerSec * outerDt;
+      const upkeep = Math.min(Math.max(0, org.reserves), basalUpkeepPerSecond(org.genome) * outerDt);
+      org.reserves -= upkeep;
+      this.chemicalHeat += upkeep;
       this.populateSensoryInputs(org);
       org.brain.step(outerDt);
     }
@@ -192,7 +256,13 @@ export class WorldSimulation {
         org.preparePhysicsSubstep(subDt, this.waterDragCoeff);
       }
       this.physics.step(subDt);
-      for(const org of this.organisms) org.finishPhysicsSubstep(subDt);
+      for(const org of this.organisms) {
+        const oldCost = org.totalMotorChemicalSpent;
+        const oldWork = org.totalWorkJoules;
+        org.finishPhysicsSubstep(subDt);
+        this.chemicalHeat += org.totalMotorChemicalSpent - oldCost;
+        this.cumulativeMechanicalWorkJoules += org.totalWorkJoules - oldWork;
+      }
     }
 
     // 5. Feeding, Reproduction, and Life cycles
@@ -202,24 +272,29 @@ export class WorldSimulation {
 
       this.checkFeeding(org, outerDt);
 
-      // Reproduction
-      if (
-        org.reserves > org.genome.metabolism.reproduceReserveThreshold &&
-        org.ageSec - org.lastReproduceSec > org.genome.metabolism.reproduceCooldownSec &&
-        this.organisms.length + this.eggs.length < this.maxOrganisms + 5
-      ) {
-        const eggCost = org.genome.metabolism.eggEnergyFunding;
-        if (org.reserves >= eggCost + 50) {
-          org.reserves -= eggCost;
+      // Every egg must be paid for by the parent, including mutated anatomy.
+      if (this.reproductionBlockReason(org) === null) {
+        const childId = `org-${this.nextIdCounter++}`;
+        let childGenome = mutateGenome(org.genome, this.prng, childId);
+        if (childGenome === org.genome) {
+          // Mutation failure must not reuse the live parent's object or ID.
+          childGenome = JSON.parse(JSON.stringify(org.genome)) as OrganismGenome;
+          childGenome.id = childId;
+          childGenome.ancestorId = org.genome.id;
+          childGenome.generation = org.genome.generation + 1;
+        }
+        const funding = Math.max(org.genome.metabolism.eggEnergyFunding, Math.ceil(viableEggFunding(childGenome)));
+        if (org.reserves - funding >= Math.max(50, org.structuralEnergy * .25)) {
+          org.reserves -= funding;
           org.lastReproduceSec = org.ageSec;
-          const mutatedGenome = mutateGenome(org.genome, this.prng, `org-${this.nextIdCounter++}`);
           this.eggs.push({
             id: `egg-${this.nextIdCounter++}`,
             parentId: org.genome.id,
-            genome: mutatedGenome,
+            genome: childGenome,
             pos: org.com.clone().add(new THREE.Vector3(0, -0.4, 0)),
-            fundingRemaining: eggCost,
-            initialFunding: eggCost,
+            rotation: org.bodies[0].rot.toArray() as [number, number, number, number],
+            fundingRemaining: funding,
+            initialFunding: funding,
             incubationRemainingSec: org.genome.metabolism.eggIncubationSec,
           });
         }
@@ -229,15 +304,18 @@ export class WorldSimulation {
       if (org.reserves <= 0 || org.ageSec >= org.genome.metabolism.lifespanSec) {
         org.isDead = true;
         this.totalDeaths++;
-        const spawnCount = Math.min(6, Math.max(1, Math.floor(org.structuralEnergy / 25)));
-        for (let k = 0; k < spawnCount; k++) {
-          this.nutrients.push({
-            id: `nut-${this.nextIdCounter++}`,
-            pos: org.com.clone().add(
-              new THREE.Vector3(this.prng.range(-0.5, 0.5), this.prng.range(-0.5, 0.5), this.prng.range(-0.5, 0.5))
-            ),
-            energy: 35,
-          });
+        const remains = org.structuralEnergy + Math.max(0, org.reserves);
+        if (remains > 0) {
+          const spawnCount = Math.min(6, Math.max(1, Math.ceil(remains / 40)));
+          for (let k = 0; k < spawnCount; k++) {
+            this.nutrients.push({
+              id: `nut-${this.nextIdCounter++}`,
+              pos: org.com.clone().add(new THREE.Vector3(
+                this.prng.range(-0.5, 0.5), this.prng.range(-0.5, 0.5), this.prng.range(-0.5, 0.5)
+              )),
+              energy: remains / spawnCount,
+            });
+          }
         }
         org.dispose();
         this.organisms.splice(oIdx, 1);
@@ -277,7 +355,7 @@ export class WorldSimulation {
     }
 
     // 2. Normalized reserves and primary joint phase
-    inArr[inIdx++] = Math.min(1.0, org.reserves / 400);
+    inArr[inIdx++] = Math.min(1.0, Math.max(0, org.reserves / org.reserveCapacity));
     const primPhase = org.joints[0]?.jointPhase || 0;
     inArr[inIdx++] = Math.sin(primPhase);
     inArr[inIdx++] = Math.cos(primPhase);
@@ -388,7 +466,7 @@ export class WorldSimulation {
         for (let i = this.nutrients.length - 1; i >= 0; i--) {
           const nut = this.nutrients[i];
           if (isContactingMouthAperture(mouthWorldPos, mouthWorldNormal, mouthRadius, nut.pos, 0.25)) {
-            const intake = Math.min(nut.energy, maxIntake);
+            const intake = Math.min(nut.energy, maxIntake, Math.max(0, org.reserveCapacity - org.reserves));
               if (intake > 0) {
                 nut.energy -= intake;
                 org.reserves += intake;
@@ -404,7 +482,9 @@ export class WorldSimulation {
                 });
                 if (org.recentFeedingEvents.length > 8) org.recentFeedingEvents.pop();
 
-                if (nut.energy <= 0.01) {
+                if (nut.energy <= 1e-9) {
+                  // Retain numerical slivers as explicitly accounted chemical heat.
+                  this.chemicalHeat += Math.max(0, nut.energy);
                   this.nutrients.splice(i, 1);
                 }
               }
@@ -423,10 +503,11 @@ export class WorldSimulation {
           const egg = this.eggs[i];
           if (egg.parentId !== org.genome.id) {
             if (isContactingMouthAperture(mouthWorldPos, mouthWorldNormal, mouthRadius, egg.pos, 0.35)) {
-              const intake = Math.min(egg.fundingRemaining, maxIntake);
+              const intake = Math.min(egg.fundingRemaining, maxIntake, Math.max(0, org.reserveCapacity - org.reserves) / TROPHIC_EFFICIENCY);
               if (intake > 0) {
                 egg.fundingRemaining -= intake; // Deduct from egg FIRST
                 const gained = intake * TROPHIC_EFFICIENCY;
+                this.chemicalHeat += intake - gained;
                 org.reserves += gained;
                 org.totalFoodEaten += gained;
                 this.totalFoodConsumed += gained;
@@ -440,7 +521,8 @@ export class WorldSimulation {
                 });
                 if (org.recentFeedingEvents.length > 8) org.recentFeedingEvents.pop();
 
-                if (egg.fundingRemaining <= 0.01) {
+                if (egg.fundingRemaining <= 1e-9) {
+                  this.chemicalHeat += Math.max(0, egg.fundingRemaining);
                   this.eggs.splice(i, 1);
                 }
               }
@@ -469,10 +551,11 @@ export class WorldSimulation {
           }
 
           if (contacted) {
-            const intake = Math.min(prey.reserves, maxIntake);
+            const intake = Math.min(prey.reserves, maxIntake, Math.max(0, org.reserveCapacity - org.reserves) / TROPHIC_EFFICIENCY);
             if (intake > 0) {
               prey.reserves -= intake; // Subtract from prey FIRST
               const gained = intake * TROPHIC_EFFICIENCY;
+              this.chemicalHeat += intake - gained;
               org.reserves += gained; // Credit predator after losses
               org.totalFoodEaten += gained;
               this.totalFoodConsumed += gained;
@@ -496,14 +579,12 @@ export class WorldSimulation {
   public getTelemetry(renderFps: number = 60, measuredStepsPerSec: number = 120, achievedSpeed: number = 1.0): EcosystemTelemetry {
     let orgReserves = 0;
     let orgTissue = 0;
-    let dissipatedWork = 0;
     let totalAnchorError = 0;
     let jointCount = 0;
 
     for (const o of this.organisms) {
       orgReserves += Math.max(0, o.reserves);
       orgTissue += o.structuralEnergy;
-      dissipatedWork += o.totalWorkJoules;
       for (const j of o.joints) {
         totalAnchorError += j.anchorError;
         jointCount++;
@@ -531,11 +612,15 @@ export class WorldSimulation {
       averageAnchorError: jointCount > 0 ? totalAnchorError / jointCount : 0,
       chemicalEnergyLedger: {
         totalInput: this.externalEnergyAdded,
-        organismReserves: Math.round(orgReserves),
-        organismTissue: Math.round(orgTissue),
-        eggEnergy: Math.round(eggEnergy),
-        nutrientEnergy: Math.round(nutEnergy),
-        dissipatedMetabolicWork: Math.round(dissipatedWork),
+        organismReserves: orgReserves,
+        organismTissue: orgTissue,
+        eggEnergy,
+        nutrientEnergy: nutEnergy,
+        dissipatedMetabolicWork: this.chemicalHeat,
+        mechanicalWorkJoules: this.cumulativeMechanicalWorkJoules,
+        externalRemovals: this.externalEnergyRemoved,
+        conservationResidual: this.externalEnergyAdded - this.externalEnergyRemoved -
+          (orgReserves + orgTissue + eggEnergy + nutEnergy + this.chemicalHeat),
       },
     };
   }
