@@ -29,6 +29,13 @@ GitHub Actions builds pull requests and deploys successful pushes to `main`. Pag
 
 The first import preserves the supplied simulation behavior. Successful builds and publication do **not** certify swimming, feeding, evolution, or the built-in verification claims. The initial audit records measured behavior and proposed follow-up work before gameplay changes are selected.
 
+- [Project status and current direction](docs/PROJECT_STATUS.md)
+- [Initial defect audit and repair recommendations](docs/INITIAL_AUDIT.md)
+- [Current 2D → 3D feature comparison](docs/FEATURE_PARITY.md)
+- [Measured baseline results](docs/audit-baseline.json)
+
+Reproduce the bounded production-module diagnostics with `npm run audit`. For JSON output, use `npm run --silent audit > results.json`. This is a diagnostic report containing known failures, not a passing test certification.
+
 The export includes a local fake Playground SDK; running the app requires no Playground account or service. Music currently uses external Google-hosted URLs. Optional audio availability does not block simulation startup.
 
 Third-party notices from the export are retained in `THIRD_PARTY_NOTICES.md`. That file also lists packages used by the export environment that this application does not import.

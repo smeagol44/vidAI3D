@@ -1,0 +1,36 @@
+{
+  "archive": "project-files (20).zip",
+  "archiveSha256": "31e318b332f3ab457ef4af4e9ab8a566d7a88a40e89537b9204bb93cceadb099",
+  "originalFiles": {
+    "agent_injected.d.ts": "5ec4cc284946907d5aea7f56e39c8f3a8c18d9cc35ada7335027b0fcc876bced",
+    "utils/BackgroundMusic.tsx": "ec9dfc8ffdbed4f3c34131ae4d33df76d1323c9021c860e56a29cdbc8226698e",
+    "sim/physics.ts": "31e3a02cb6fba0b15aa918f26fdb4fdb5587719e9da70883822045b6a83fbe20",
+    "input.ts": "e604c2c47b430db7c57ceb014db8d57dff94c8abb2badf909ea52092021d823c",
+    "utils/index.ts": "7199252123f16fb0b968c6faa6aa4c2e4311fa1fb126e951826519f6ae79c5cb",
+    "design/game_design_document.json": "30bd0293412ea03381dd89949a43323982a2e544c2cdaefa3c0ecebf175bae11",
+    "sim/prng.ts": "5055fb2f5899d2512986d2c3c771d4daa903b9a9a40a4e3332923c8425dc3e1e",
+    "utils/usePlayground.ts": "6f9dcfea393b78c54ab1113075e00c9fa5cb9d19e226b09251709281fc56e8bc",
+    "utils/playground-fake.ts": "52b1ceef10268d7131800a7506ccc26c4092358dcdfdea6b3f1262934e503824",
+    "game.json": "03c2dea8f5ee04dcd335d0e46a8f9d5f9605d456b7df7b24116e1c883f4f7d16",
+    "tsconfig.json": "57b9aac92d11199f9b231af8f04ab81c975f13291fce1993f225218e837c842b",
+    "types.ts": "25f8e5b6ed152635f6fe20483dfcc1836aa4fdd25c4049d91e7ebe8e197bca99",
+    "playground_config.json": "ccf135d0e7d25ccc843d347b0be0d950dbaa5cb7302211a808828bc68890a298",
+    "THIRD_PARTY_NOTICES.md": "d6a6ba6a98f65daeed853743d57af6e3a5a3190256d85f0e51b6bc4cc093e56c",
+    "utils/helper.tsx": "cb697b97105738145b761eb62bd83d71e46cb377ba509c1b09793f49779de2ef",
+    "index.tsx": "6f996862ac9886935166d011b7db82e5cc236417bd6319052b7969d59ecf3794",
+    "utils.ts": "9f76ac3bf5cdf7d6016b9f65951b57ca8c2955790cb4f90573a8263122334c18",
+    "sim/genome.ts": "f4e773ef85477d3e8c1200a64192cee022778adc64a19733e78647cb0e36ada3",
+    "sim/verification.ts": "3d8614c512fb90a6193e135db69860867c230cf4fae9233e0ac90cb0cf158860",
+    "constants.ts": "39e2955465ba12383bab216c53d9b6bf485cf6624c6590d6b2acc29a9a6c53d4",
+    "sim/mutation.ts": "4645ef6c3c99e5e87c366fb44aefd300fdf841234dcb3f17e03c00ef4a925959",
+    "App.tsx": "c1795eec7f4218e7892ba98c52c47c95bccb676e60ed641a465efa95ce838a73",
+    "sim/organism.ts": "a53a4bd02b07c5a567b336b87f68fa22760122c0f3599d00a7b2a92c4b6a0aaf",
+    "sim/simulation.ts": "fb4ed0829e24f4ce3a6746f594d54553b496f59ec6763e212d3984182679f98a",
+    "Game.tsx": "afcbc2614fa3619f17524d4aa5a29a0e5c832cb06562fb280e28ca60eafcb363"
+  },
+  "integrationChanges": [
+    "index.tsx: import locally built CSS",
+    "tsconfig.json: exclude agent_injected.d.ts, node_modules and dist"
+  ],
+  "baselineCommit": "927b377020a235fb00d0ab46f292cf39de3d5ccb"
+}
