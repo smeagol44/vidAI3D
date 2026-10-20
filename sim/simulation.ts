@@ -103,8 +103,9 @@ export class WorldSimulation {
 
     // Seed calibrated founder organisms
     for (let i = 0; i < initialOrganisms; i++) {
-      const typeChoice = i % 3 === 0 ? 'planar_swimmer' : i % 3 === 1 ? '3d_serpent' : 'tri_limb';
-      const genome = createFounderGenome(`founder-${i + 1}`, `V-Swimmer #${i + 1}`, this.prng, typeChoice);
+      const typeChoice = i % 3 === 0 ? 'planar_swimmer' : i % 3 === 1 ? '3d_serpent' : 'fin_tail';
+      const genome = createFounderGenome(`founder-${i + 1}`,
+        typeChoice === 'fin_tail' ? `F-Tail #${i + 1}` : `V-Swimmer #${i + 1}`, this.prng, typeChoice);
       const pos = new THREE.Vector3(
         this.prng.range(-this.tankBounds.x * 0.4, this.tankBounds.x * 0.4),
         this.prng.range(3, this.tankBounds.y - 3),
