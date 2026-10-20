@@ -150,7 +150,9 @@ test('egg predation accounts for the exact trophic loss and remaining egg fundin
     s.clearFreeNutrients();s.nutrientInflowPerSec=0;s.targetNutrientCount=0;
     const parentGenome=genome();parentGenome.metabolism.reproduceCooldownSec=.1;parentGenome.metabolism.reproduceReserveThreshold=300;
     const parent=s.addOrganism(parentGenome,new THREE.Vector3(6,8,0));
-    const predator=s.addOrganism(genome('3d_serpent'),new THREE.Vector3(0,8,0));
+    const predatorGenome=genome('3d_serpent');
+    predatorGenome.id='unrelated-predator'; // own-egg exclusion is keyed to genome identity
+    const predator=s.addOrganism(predatorGenome,new THREE.Vector3(0,8,0));
     parent.ageSec=1;
     s.feedAllOrganisms(250);
     s.stepOuterTick();
