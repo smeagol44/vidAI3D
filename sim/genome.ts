@@ -19,6 +19,10 @@ export interface VoxelPartGene {
   motorMaxTorque: number;
   motorFrequency: number;
   motorPhase: number;
+  /** Optional inherited fraction of cycle spent on the positive sweep (0.2..0.8; default 0.5). */
+  motorStrokeDuty?: number;
+  /** Optional inherited recovery-only pitch relative to rest angle on an articulated fin (radians). */
+  motorFeatherAngle?: number;
   hasMouth: boolean;
   mouthFace?: FaceDirection;
   mouthDiet?: 'herbivore' | 'carnivore' | 'omnivore';
@@ -205,6 +209,8 @@ export function validateGenome(genome: OrganismGenome): boolean {
     if (![part.dimX,part.dimY,part.dimZ].every(Number.isInteger)) return false;
     if (part.dimX < 1 || part.dimY < 1 || part.dimZ < 1) return false;
     if (part.thicknessScaleY !== undefined && (!Number.isFinite(part.thicknessScaleY) || part.thicknessScaleY < MIN_THICKNESS_SCALE_Y || part.thicknessScaleY > 1)) return false;
+    if (part.motorStrokeDuty !== undefined && (!Number.isFinite(part.motorStrokeDuty) || part.motorStrokeDuty < .2 || part.motorStrokeDuty > .8)) return false;
+    if (part.motorFeatherAngle !== undefined && (!Number.isFinite(part.motorFeatherAngle) || Math.abs(part.motorFeatherAngle) > Math.PI / 2)) return false;
     if (part.dimX > 5 || part.dimY > 5 || part.dimZ > 5) return false;
   }
 
