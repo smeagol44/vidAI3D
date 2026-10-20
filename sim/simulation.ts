@@ -161,6 +161,14 @@ export class WorldSimulation {
     return null;
   }
 
+  /** Discard free nutrients explicitly as an external sink, never silently. */
+  public clearFreeNutrients(): number {
+    const removed = this.nutrients.reduce((sum, nutrient) => sum + nutrient.energy, 0);
+    this.nutrients = [];
+    this.externalEnergyRemoved += removed;
+    return removed;
+  }
+
   public seedNutrients(count: number) {
     for (let i = 0; i < count; i++) {
       const pos = new THREE.Vector3(
@@ -571,13 +579,13 @@ export class WorldSimulation {
   public getTelemetry(renderFps: number = 60, measuredStepsPerSec: number = 120, achievedSpeed: number = 1.0): EcosystemTelemetry {
     let orgReserves = 0;
     let orgTissue = 0;
-     let totalAnchorError = 0;
+    let totalAnchorError = 0;
     let jointCount = 0;
 
     for (const o of this.organisms) {
       orgReserves += Math.max(0, o.reserves);
       orgTissue += o.structuralEnergy;
-       for (const j of o.joints) {
+      for (const j of o.joints) {
         totalAnchorError += j.anchorError;
         jointCount++;
       }
