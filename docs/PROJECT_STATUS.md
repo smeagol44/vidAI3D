@@ -1,5 +1,22 @@
 # VIDA 3D project status
 
+## 2026-10-20 — v0.2.1 production-path neural locomotion repair
+
+**Scope and identity:** A post-v0.2.0 player report said creatures articulated but did not travel visibly in the published ecosystem. We reproduced a reduced, fresh, deterministic *live* planar founder in `WorldSimulation.stepOuterTick()`, with sensory inputs, recurrent updates, normal metabolic cost, two Rapier substeps per outer tick and actual physical work. A neutral-output control received identical ticks/biology. No feeding, walls or other organisms contacted the test swimmer. The 2D repository was strictly untouched.
+
+**Demonstrated causes:** Newly founded brains had randomly strong angle-offset and stiffness outputs that disrupted the otherwise useful inherited oscillator gait. More severely, each joint independently integrated neural frequency modulation forever, gradually unwinding the inherited phase relationships: the original recurrent swimmer reversed travel and made progressively weaker strokes; enabling *only* the frequency channels still reversed movement. This was a motor/controller integration and founder-initialization problem, not evidence to replace Rapier or inject forces.
+
+**Bounded corrections:**
+- Keep the leading joint's inherited frequency plus real neural modulation. The remaining joints continue to respond to *their own* frequency channels, with a 3/s phase-error correction toward their **inherited mutable** relative offsets. This prevents indefinite phase drift without overriding joint angles, forces, velocities or the solver.
+- New founders retain sparse, nonzero recurrent controllers; their initially random angle-trim and stiffness output weights/biases are scaled to 15% of the previous range so a useful inherited stroke survives early neural activity. Existing/imported genomes are not rewritten.
+- Output weights and biases now mutate in offspring; the founding gait prior is not frozen across generations.
+
+**Measured 20-second production-path test:** Original neutral 2.291 m net; original live recurrent 1.208 m net with -1.207 m signed progress (reversed). With frequency channels alone, the pre-fix 0.563 m net was also backwards. Corrected live recurrent: **2.135 m net and 2.135 m forward**, 2.151 m COM path; final five completed strokes each advance 0.178–0.180 m. With frequency channels alone: **2.268 m net and forward**. Recurrent output activity remained nonzero (mean absolute 0.0674); reserves finished at 199.91 versus 202.21 neutral, with no refills. Maximum relative oscillator phase error was 0.137 rad; maximum joint anchor gap 0.046 mm. The repaired live swimmer reached about 93% of neutral-reference travel in this fixture. Raw evidence and exact test/run identities: [live-locomotion-results-0.2.1.json](live-locomotion-results-0.2.1.json).
+
+**Regression:** `tests/live-locomotion.test.ts` exercises the same full production tick, verifies positive forward net travel, persistent per-stroke progress, meaningful neural activity, bounded phase error, work/energy, hinge integrity, and actual mutability of motor outputs. The pre-fix 1.208 m and 0.563 m cases fail the new travel thresholds. The previous 20 physical/clock tests remain in the suite. Validation uses GitHub Actions with `npm ci`, `npm run test:fast` and `npm run build` (22 tests).
+
+**Limits:** These results establish a real cause and useful travel for **one** fresh planar founder, not population-wide reliable movement, all imported specimens, active foraging, or long-term ecological survival. A 2.7 m swimmer still only covers about 0.79 body lengths in 20 seconds within a 26 m tank. The trilimb is not newly certified. Separate energy, feeding, vision and identity defects remain. No manual/published-game browser validation was performed.
+
 ## 2026-10-20 — approved physics and timing repair, v0.2.0
 
 The user approved replacing the custom solver with Rapier before energy, perception/mouth and UI work. They explicitly prefer focused automated/static checks over manually opening the published game. This implementation follows that scope; the 2D repository was not modified.
