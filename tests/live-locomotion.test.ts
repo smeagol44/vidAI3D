@@ -8,7 +8,7 @@ import { PRNG } from '../sim/prng';
 
 await initializePhysics();
 
-type Mode = 'neutral' | 'recurrent';
+type Mode = 'neutral' | 'recurrent' | 'no-frequency' | 'no-offset' | 'no-torque' | 'no-stiffness' | 'only-frequency';
 
 /** Same world tick as the app, not the isolated physics-only reference. */
 function runLiveSwimmer(mode: Mode, seconds = 20) {
@@ -20,6 +20,16 @@ function runLiveSwimmer(mode: Mode, seconds = 20) {
     const genome = createFounderGenome('probe', 'planar_swimmer', new PRNG(4242), 'planar_swimmer');
     const org = sim.addOrganism(genome, new THREE.Vector3(0, 8, 0));
     if (mode === 'neutral') org.brain.step = () => { org.brain.outputs.fill(0); };
+    else if (mode !== 'recurrent') {
+      const nativeStep = org.brain.step.bind(org.brain);
+      const blocked = mode === 'no-offset' ? 0 : mode === 'no-frequency' ? 1 : mode === 'no-torque' ? 2 : 3;
+      org.brain.step = (dt: number) => {
+        nativeStep(dt);
+        for (let i = 0; i < org.joints.length * 4; i++) {
+          if (mode === 'only-frequency' ? i % 4 !== 1 : i % 4 === blocked) org.brain.outputs[i] = 0;
+        }
+      };
+    }
     const initial = org.com.clone(), previous = initial.clone();
     const initialReserve = org.reserves;
     let path = 0, targetSpan = 0, actualSpan = 0, outputAbs = 0, outputCount = 0;
@@ -55,7 +65,8 @@ function runLiveSwimmer(mode: Mode, seconds = 20) {
 test('report neutral vs inherited-recurrent swimmer through complete ecosystem ticks', () => {
   const neutral = runLiveSwimmer('neutral');
   const live = runLiveSwimmer('recurrent');
-  console.log('LIVE_SWIMMING_BASELINE', JSON.stringify({ neutral, live }));
+  const ablations = (['no-frequency', 'no-offset', 'no-torque', 'no-stiffness', 'only-frequency'] as const).map(run => runLiveSwimmer(run));
+  console.log('LIVE_SWIMMING_ABLATIONS', JSON.stringify({ neutral, live, ablations }));
   assert.ok(neutral.finite && live.finite);
   assert.equal(neutral.worldSteps, 2400);
   assert.equal(live.worldSteps, 2400);
