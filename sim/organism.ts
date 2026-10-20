@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { FaceDirection, OrganismGenome, VoxelPartGene, VOXEL_UNIT, isBroadFace } from './genome';
+import { FaceDirection, OrganismGenome, VoxelPartGene, isBroadFace, partPhysicalSize, MIN_THICKNESS_SCALE_Y } from './genome';
 import { RigidCuboid, RevoluteJoint, PhysicsWorld, PHYSICS_DT, faceAnchor, faceNormal, axisVector } from './physics';
 import { OBB } from 'three/examples/jsm/math/OBB.js';
 import { constructionEnergy, founderReserve, reserveCapacity, CHEMICAL_UNITS_PER_MOTOR_JOULE } from './energy';
@@ -79,6 +79,7 @@ export function bodyLayout(genome: OrganismGenome, position: THREE.Vector3, rota
   const ids = new Set<string>();
   for (const p of genome.parts) {
     if (ids.has(p.id) || !['X','Y','Z'].includes(p.hingeAxis) || ![p.dimX,p.dimY,p.dimZ].every(n=>Number.isInteger(n)&&n>=1&&n<=5)
+      || (p.thicknessScaleY !== undefined && (!Number.isFinite(p.thicknessScaleY) || p.thicknessScaleY < MIN_THICKNESS_SCALE_Y || p.thicknessScaleY > 1))
       || ![p.minAngle,p.maxAngle,p.restAngle,p.motorMaxTorque,p.motorFrequency,p.motorPhase].every(Number.isFinite)
       || p.minAngle > p.maxAngle || p.restAngle < p.minAngle || p.restAngle > p.maxAngle || p.minAngle <= -Math.PI || p.maxAngle >= Math.PI || p.motorMaxTorque < 0 || p.motorFrequency < 0)
       throw new Error('Invalid physical part: ' + p.id);
@@ -93,14 +94,14 @@ export function bodyLayout(genome: OrganismGenome, position: THREE.Vector3, rota
       if (p.parentId !== null) {
         if (!p.parentFace || !p.attachFace || !['+X','-X','+Y','-Y','+Z','-Z'].includes(p.parentFace) || !['+X','-X','+Y','-Y','+Z','-Z'].includes(p.attachFace)) throw new Error('Invalid attachment face: '+p.id);
         const parent = poses.get(p.parentId)!;
-        if(isBroadFace(p.parentFace,parent.gene.dimX,parent.gene.dimY,parent.gene.dimZ)&&isBroadFace(p.attachFace,p.dimX,p.dimY,p.dimZ))
+        if(isBroadFace(p.parentFace,parent.gene.dimX,parent.gene.dimY,parent.gene.dimZ,parent.gene.thicknessScaleY)&&isBroadFace(p.attachFace,p.dimX,p.dimY,p.dimZ,p.thicknessScaleY))
           throw new Error('Broad-to-broad attachment: '+p.id);
         alignment.setFromUnitVectors(faceNormal(p.attachFace), faceNormal(p.parentFace).negate());
         rot = parent.rot.clone().multiply(new THREE.Quaternion().setFromAxisAngle(axisVector(p.hingeAxis), THREE.MathUtils.clamp(p.restAngle,p.minAngle,p.maxAngle))).multiply(alignment).normalize();
         pos = faceAnchor(p.parentFace,parent.gene).applyQuaternion(parent.rot).add(parent.pos)
           .sub(faceAnchor(p.attachFace,p).applyQuaternion(rot));
       }
-      const half = new THREE.Vector3(p.dimX,p.dimY,p.dimZ).multiplyScalar(VOXEL_UNIT/2);
+      const half = new THREE.Vector3(...partPhysicalSize(p)).multiplyScalar(.5);
       const box = new OBB(new THREE.Vector3(),half.clone().addScalar(-1e-5));
       box.applyMatrix4(new THREE.Matrix4().compose(pos,rot,new THREE.Vector3(1,1,1)));
       for (const other of poses.values()) if (box.intersectsOBB(other.box)) throw new Error('Overlapping rest anatomy: '+p.id+' / '+other.gene.id);
