@@ -93,3 +93,22 @@ test('without neural angle motion direct-only joints cannot invent propulsion', 
     assert.equal(o.totalMotorChemicalSpent,0);
   }finally{o.dispose();}
 });
+
+test('asymmetric feather hinge direct mode reaches both physical angle limits without oscillator', () => {
+  const g=createFounderGenome('fin-direct','Fin',new PRNG(4242),'fin_tail');
+  const blade=g.parts.find(p=>p.id==='blade-0')!;
+  assert.ok(blade.restAngle!==0 && blade.maxAngle>0 && blade.minAngle<0);
+  blade.motorRhythmMix=0;
+  const o=new OrganismInstance(g,new THREE.Vector3(0,8,0));
+  try {
+    const index=o.joints.findIndex(j=>j.child.id===blade.id);
+    assert.ok(index>=0);
+    o.brain.outputs.fill(0);
+    o.brain.outputs[index*4]=1;
+    o.preparePhysicsSubstep(PHYSICS_DT,250);
+    assert.ok(Math.abs(o.joints[index].targetAngle-blade.maxAngle)<1e-9);
+    o.brain.outputs[index*4]=-1;
+    o.preparePhysicsSubstep(PHYSICS_DT,250);
+    assert.ok(Math.abs(o.joints[index].targetAngle-blade.minAngle)<1e-9);
+  }finally{o.dispose();}
+});

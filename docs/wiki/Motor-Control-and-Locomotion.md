@@ -6,7 +6,9 @@ VIDA 3D uses **physical** revolute joints between real Rapier rigid cuboids. Mot
 
 Each joint has four existing recurrent neural outputs: **angle (posture/trim)**, oscillator **frequency**, motor **torque allowance**, and **stiffness**. A new **optional** inherited part trait, `motorRhythmMix` in the range **0–1**, determines how much of the prescribed oscillator's target is mixed into the current physical joint target:
 
-`target = restAngle + neuralAngle × (maxAngle - minAngle)/2 + rhythmMix × rhythmicStroke`
+`target = rhythmMix × legacyRhythmicTarget + (1 - rhythmMix) × directAngleTarget`
+
+The legacy target is the original inherited `restAngle + neuralTrim + rhythmicStroke` (or optional feathered stroke), with its existing hinge clamping. The direct target is `(minAngle + maxAngle)/2 + neuralAngle × (maxAngle - minAngle)/2`, allowing the same neural Angle output to access the **full hinge range even when restAngle is asymmetric**.
 
 - **Absent** or **1:** existing rhythmic motor formula and genetic phase/feathering, unchanged for existing founders and saved DNA.
 - **0:** rhythmic target contribution is disabled. The *same recurrent angle output* can drive full-range direct joint posture within the physical hinge limits. A silent/constant angle output supplies no artificial locomotion.

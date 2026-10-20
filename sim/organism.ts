@@ -237,17 +237,21 @@ export class OrganismInstance {
         Math.sin(joint.jointPhase - parentPhase - inheritedOffset),
         Math.cos(joint.jointPhase - parentPhase - inheritedOffset));
       const featherPhase = (parentPhase ?? joint.jointPhase) + phaseError;
-      // Evolved oscillator/direct mix, inspired by VIDA 2D's optional rhythm.
-      // Missing allele = exact legacy target for old founders and imported DNA.
-      // At zero mix the existing Angle neural channel drives the entire joint
-      // posture without a prescribed wave; all force still comes from Rapier motors.
-      const rhythmMix = g.motorRhythmMix ?? 1;
-      const target = g.motorFeatherAngle === undefined
-        ? g.restAngle + offset + rhythmMix * (g.maxAngle-g.minAngle) * .45 * strokeWave(joint.jointPhase, g.motorStrokeDuty ?? .5)
+      // Preserve the full legacy expression for genomes without this allele.
+      // Evolved joints blend the old rhythmic target with posture commanded
+      // directly by the same neural Angle output over the *entire* hinge range.
+      // Midpoint mapping matters for asymmetric feather hinges (rest ~= center).
+      const legacyTarget = g.motorFeatherAngle === undefined
+        ? g.restAngle + offset + (g.maxAngle-g.minAngle) * .45 * strokeWave(joint.jointPhase, g.motorStrokeDuty ?? .5)
         : THREE.MathUtils.clamp(
-            g.restAngle + offset + rhythmMix * g.motorFeatherAngle * recoveryFeatherWeight(featherPhase),
+            g.restAngle + offset + g.motorFeatherAngle * recoveryFeatherWeight(featherPhase),
             g.minAngle, g.maxAngle
           );
+      const directTarget = (g.minAngle + g.maxAngle) * .5
+        + (outputs[outIdx] || 0) * (g.maxAngle - g.minAngle) * .5;
+      const rhythmMix = g.motorRhythmMix ?? 1;
+      const target = g.motorRhythmMix === undefined ? legacyTarget
+        : rhythmMix * legacyTarget + (1 - rhythmMix) * directTarget;
       joint.applyMotorAndLimits(target,allowance,stiffness,60);
       outIdx+=4;
     }
