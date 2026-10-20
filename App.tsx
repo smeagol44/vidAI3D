@@ -413,6 +413,14 @@ export default function App() {
                 Anatomy ({selectedOrg.bodies.length} parts, {selectedOrg.joints.length} joints)
               </span>
               <div className="space-y-1 text-[11px]">
+                {selectedOrg.bodies.filter(b => (b.partGene.thicknessScaleY ?? 1) < 1).map(b => (
+                  <div key={b.id} className="flex justify-between items-center text-slate-300 bg-slate-950/50 px-2 py-1 rounded">
+                    <span>{b.id} · thin plate</span>
+                    <span className="font-mono text-cyan-400">
+                      {(b.dimX * 100).toFixed(0)} × {(b.dimY * 100).toFixed(1)} × {(b.dimZ * 100).toFixed(0)} cm
+                    </span>
+                  </div>
+                ))}
                 {selectedOrg.joints.map((j, idx) => (
                   <div key={idx} className="flex justify-between items-center text-slate-300 bg-slate-950/50 px-2 py-1 rounded">
                     <span>Joint #{idx + 1} ({j.child.partGene.hingeAxis}-axis)</span>
@@ -888,7 +896,7 @@ export default function App() {
               <div>
                 <h4 className="font-bold text-cyan-300 text-sm mb-1">1. Artificial Life &amp; 3D Hydrodynamics</h4>
                 <p>
-                  Creatures consist of articulated integer cuboids connected by physical revolute joints. Swimming emerges from the normal linear surface-resistance model in 3D water without artificial forces.
+                  Creatures consist of articulated voxel-based cuboids, including evolvable physically thin plates, connected by real revolute joints. Swimming emerges from the normal linear surface-resistance model in 3D water without artificial forces.
                 </p>
               </div>
 
