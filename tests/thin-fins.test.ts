@@ -103,7 +103,7 @@ test('offspring fin thickness remains a valid evolvable feature',()=>{
 
 test('measured isolated full-ecosystem articulated fin candidates',()=>{
  const variants=[.2,.5,1].flatMap(scale=>[0,.5,1].map(phase=>({scale,phase})));
- const records=[];
+ const records: {scale:number;phase:number;net:number;forward:number;side:number;energySpent:number;alive:boolean;gap:number;residual:number}[]=[];
  for(const {scale,phase} of variants){
    const s=new WorldSimulation(4242,0);
    try{
