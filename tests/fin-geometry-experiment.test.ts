@@ -5,47 +5,48 @@ import {WorldSimulation} from '../sim/simulation';
 import {createFounderGenome} from '../sim/mutation';
 import {PRNG} from '../sim/prng';
 await initializePhysics();
-interface Gait{axis:'Y'|'Z';span:number;chord:number;phaseLag:number;rightBasePhase:number;rightPhaseSign:number;torque:number}
-function run(cfg:Gait,seconds=7){
+type Kind='planar_swimmer'|'3d_serpent';
+type Shape={kind:Kind; pattern:'baseline'|'all-wide'|'tail-wide'|'alternating-wide'|'distal-wide'|'tapered'|'all-long-wide';torque:number;frequency:number};
+function measure(o:Shape,seconds=10){
  const s=new WorldSimulation(4242,0);
  try{
-  s.clearFreeNutrients();s.targetNutrientCount=0;s.nutrientInflowPerSec=0;
-  const g=createFounderGenome('fins','tri_limb',new PRNG(4242),'tri_limb');
-  const [root,originalLeft,originalRight]=g.parts;
-  root.dimY=1;
-  const left={...originalLeft,dimX:1,dimY:cfg.span,dimZ:cfg.chord,hingeAxis:cfg.axis,motorPhase:0,motorMaxTorque:cfg.torque};
-  const right={...originalRight,dimX:1,dimY:cfg.span,dimZ:cfg.chord,hingeAxis:cfg.axis,motorPhase:Math.PI*cfg.rightBasePhase,motorMaxTorque:cfg.torque};
-  const leftTip={...left,id:'part-3',parentId:left.id,parentFace:'+Z' as const,attachFace:'-Z' as const,
-    motorPhase:Math.PI*cfg.phaseLag,hasMouth:false,hasEye:false};
-  const rightTip={...right,id:'part-4',parentId:right.id,parentFace:'+Z' as const,attachFace:'-Z' as const,
-    motorPhase:Math.PI*(cfg.rightBasePhase+cfg.rightPhaseSign*cfg.phaseLag),hasMouth:false,hasEye:false};
-  g.parts=[root,left,leftTip,right,rightTip];
-  const o=s.addOrganism(g,new THREE.Vector3(0,8,0)),start=o.com.clone(),reserve=o.reserves;
-  let maxGap=0,peakPhase=0;
+  s.clearFreeNutrients();s.nutrientInflowPerSec=0;s.targetNutrientCount=0;
+  const g=createFounderGenome('blade',o.kind,new PRNG(4242),o.kind);
+  for(const [i,p] of g.parts.entries()){
+   if(o.pattern==='all-wide')p.dimY=3;
+   if(o.pattern==='tail-wide'&&i>=4)p.dimY=3;
+   if(o.pattern==='alternating-wide'&&i%2===1)p.dimY=3;
+   if(o.pattern==='distal-wide'&&i===5)p.dimY=3;
+   if(o.pattern==='tapered')p.dimY=i<=1?3:i<=3?2:1;
+   if(o.pattern==='all-long-wide'){p.dimY=4;p.dimZ=4;}
+   if(i>0){p.motorMaxTorque=o.torque;p.motorFrequency=o.frequency;}
+  }
+  const organism=s.addOrganism(g,new THREE.Vector3(0,8,0)),first=organism.com.clone(),initialReserve=organism.reserves;
+  let maxGap=0,half=0;
   for(let i=0;i<seconds*60;i++){
    s.stepOuterTick();
-   for(const j of o.joints)maxGap=Math.max(maxGap,j.anchorError);
-   if(!s.organisms.includes(o))break;
+   if(i===seconds*30-1)half=organism.com.distanceTo(first);
+   for(const j of organism.joints)maxGap=Math.max(maxGap,j.anchorError);
+   if(!s.organisms.includes(organism))break;
   }
-  return{cfg,net:o.com.distanceTo(start),forward:o.com.z-start.z,lateral:o.com.x-start.x,
-    initialReserve:reserve,reserve:o.reserves,spent:reserve-o.reserves,
-    maxGap,alive:s.organisms.includes(o),residual:s.getTelemetry().chemicalEnergyLedger.conservationResidual};
- }catch(e){return{cfg,error:String(e)};}finally{s.dispose();}
+  return{opt:o,net:organism.com.distanceTo(first),forward:organism.com.z-first.z,lateral:organism.com.x-first.x,
+   half,spent:initialReserve-organism.reserves,work:organism.totalWorkJoules,reserve:organism.reserves,
+   maxGap,residual:s.getTelemetry().chemicalEnergyLedger.conservationResidual,alive:s.organisms.includes(organism)};
+ }catch(e){return{opt:o,error:String(e)};}finally{s.dispose();}
 }
-test('diagnostic: two hinged thin broad fins and asymmetric traveling phases',()=>{
- const measurements:ReturnType<typeof run>[]=[];
- for(const axis of ['Y','Z'] as const)
- for(const span of [1,3,5])
- for(const chord of [2,4])
- for(const phaseLag of [.25,.5,.75])
- for(const rightBasePhase of [0,.5,1,1.5])
- for(const rightPhaseSign of [-1,1])
-  measurements.push(run({axis,span,chord,phaseLag,rightBasePhase,rightPhaseSign,torque:800}));
- const good=measurements.filter((x):x is ReturnType<typeof run> & {forward:number;net:number;alive:boolean} => typeof x.forward==='number' && x.alive===true && Number.isFinite(x.forward));
- console.log('MULTIJOINT_FIN_SWEEP',JSON.stringify({
-  candidates:measurements.length,valid:good.length,
-  topForward:good.sort((a,b)=>b.forward-a.forward).slice(0,30),
-  topBack:good.sort((a,b)=>a.forward-b.forward).slice(0,8),
-  errors:measurements.filter(x=>'error'in x).slice(0,15)
- }));
+test('diagnostic: same-thickness six-link fish with thin broad fins of several profiles',()=>{
+ const results:ReturnType<typeof measure>[]=[];
+ for(const kind of ['planar_swimmer','3d_serpent'] as const)
+ for(const pattern of ['baseline','all-wide','tail-wide','alternating-wide','distal-wide','tapered','all-long-wide'] as const)
+ for(const torque of [400,800,1600])
+ for(const frequency of [.5,.65])
+ results.push(measure({kind,pattern,torque,frequency}));
+ const good=results.filter((x):x is ReturnType<typeof measure> & {net:number;forward:number;alive:boolean}=>typeof x.forward==='number'&&x.alive===true);
+ const summary={} as Record<string,unknown>;
+ for(const kind of ['planar_swimmer','3d_serpent'] as const){
+  summary[kind]=good.filter(x=>x.opt.kind===kind).sort((a,b)=>b.forward-a.forward).slice(0,25);
+  summary[kind+'-baseline']=good.filter(x=>x.opt.kind===kind&&x.opt.pattern==='baseline');
+ }
+ summary.errors=results.filter(x=>'error'in x);
+ console.log('THIN_WIDE_SWIMMERS',JSON.stringify(summary));
 });
