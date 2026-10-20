@@ -1,5 +1,13 @@
 # VIDA 3D project status
 
+## 2026-10-20 — v0.2.10 Phase B: sustained swimming audit (diagnostic only)
+
+An opt-in, bounded locomotion benchmark now runs each published founding anatomy with its **actual inherited recurrent neural controller**, live Rapier hinges, normal-only water resistance, biologically charged motors and the production WorldSimulation. In isolated still water, the test explicitly disables food/inflow and additional organisms/eggs, **without adding energy or motion**. Paired heading trials rotate the complete same-genotype body and its existing eyes. A no-motor control and an optional heritable direct-motor allele counterfactual are supported.
+
+The audit distinguishes actual mass-weighted **final net COM displacement, total COM path, peak radius, first- and last-half net swimming, late path, path straightness, signed progress in original forward orientation, final root orientation deviation, net/late net per charged motor-energy**, and actual physical hinge/ledger error. Positive long-term movement and energy cost must be measured, not inferred from swinging parts or visual frame rate.
+
+This is **not a biological fitness score or selection algorithm**. The audit does not reward or cull any living organism, change default starter DNA, introduce artificial thrust, or affect imported saves. The scripted reference is `npm run benchmark:locomotion -- --seed 4242 --seconds 8`; focused production-module regression tests run in the normal fast suite. No change to VIDA 2D. This feature supplies a consistent basis for the next measured locomotion/steering improvement, but **does not by itself make creatures faster or establish useful autonomous foraging**.
+
 ## 2026-10-20 — v0.2.9 Phase B: independently evolvable neural/rhythmic motor mixing and physical locomotion observation
 
 VIDA 3D now supports an optional, bounded inherited `motorRhythmMix` on physical hinge parts. A small ordinary offspring mutation can introduce or change a 0–1 rhythmic contribution without adding neural channels or body forces. Zero mix disables mandatory sinusoidal/feathered target movement on that joint and gives the existing neural Angle output direct posture authority across the full allowed hinge range (including asymmetric feather rests); partial values blend the old and direct targets. **Absent trait retains the exact old target equation**, preserving existing founder behavior and imported saved DNA. Genome import/physical construction independently validate the bounded finite trait. This is informed by the latest VIDA 2D motor design **read-only**; the two projects retain independent implementations.
