@@ -87,6 +87,8 @@ test('power stroke and recovery pitch are genetically inherited and can mutate',
  for(const invalid of [{motorStrokeDuty:0},{motorStrokeDuty:1},{motorStrokeDuty:NaN},{motorFeatherAngle:100},{motorFeatherAngle:Infinity}]){
   const g=fins();Object.assign(g.parts[1],invalid);
   assert.equal(validateGenome(g),false);
+  assert.throws(()=>new OrganismInstance(g,new THREE.Vector3(0,8,0)),/Invalid physical part/,
+    'invalid loaded gait cannot reach Rapier construction');
  }
 });
 
@@ -163,4 +165,12 @@ test('same-size old and feathered blades over twenty simulated seconds',()=>{
   assert.ok(Number.isFinite(x.net)&&x.path>=x.net&&x.spent>0&&x.remaining>0
     &&x.maxGap<.005&&Math.abs(x.residual)<1e-5);
  }
+ assert.ok(feathered.net > baseline.net*1.25,
+   'power/recovery must increase sustained net travel, not just limb path');
+ assert.ok(-feathered.delta[2] > -baseline.delta[2]*1.3,
+   'signed longitudinal progress must also improve');
+ assert.ok(feathered.spent < baseline.spent*.85,
+   'recovery must cost less chemical energy without a subsidy');
+ assert.ok(feathered.net/feathered.spent > 1.5*baseline.net/baseline.spent,
+   'improve net displacement per chemical energy spent');
 });
