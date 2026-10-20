@@ -1,5 +1,7 @@
 # Thin plate morphology and fin articulation — VIDA 3D v0.2.4
 
+> **Next result:** v0.2.5 adds heritable, phase-coupled power/recovery timing with a measured 20-second same-geometry net-distance and energy advantage. See [FIN_POWER_RECOVERY.md](FIN_POWER_RECOVERY.md). The negative symmetrical-fin measurements below remain the original v0.2.4 historical evidence.
+
 ## Scope and assumptions
 
 This phase enables **real, sub-voxel physical thickness** of a part without changing the voxel-grid length/width or abandoning a single Rapier world. The user requested thinner, wider parts and independently articulated fins as a locomotion direction. Existing published six-link swimmer founders remain unchanged until faster motion is demonstrated through living-ecosystem tests. No 2D code was changed.
