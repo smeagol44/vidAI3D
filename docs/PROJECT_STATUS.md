@@ -1,5 +1,13 @@
 # VIDA 3D project status
 
+## 2026-10-20 — v0.2.7 Phase A: UI identity, audio looping and current Wiki source
+
+The visible version now follows `package.json` on the header, start screen and simulation menu, with the exact creator credit. The manual pioneer button offers current planar/serpent/fin-tail starters rather than the legacy default tri-limb, without removing that genotype or changing saves.
+
+The audio component adopts the existing 2D Web Audio decoded sample-boundary trim/equal-power seam technique; HTML audio remains a fallback. New static/synthetic PCM checks exercise version consistency and loop endpoints. Added current-only Wiki source pages for the UI and music and a publishing workflow to update the **actual 3D Wiki repository** after merge.
+
+**Limitations:** The remote track, CORS and audible behavior require real-browser investigation only if necessary; HTML fallback is not gapless by guarantee. This release does **not fix** the ~10-second observed deaths or poor net locomotion: causal diagnosis and correction remain next in Phase A/B. Physics, metabolism, the energy ledger and genome formats were not changed. CI, Pages and Wiki publishing require post-merge verification.
+
 ## 2026-10-20 — v0.2.6 independent fin-tail founder with measured neural steering
 
 User-approved next locomotion milestone: integrate the physical thin-plate power/recovery mechanics into a **useful new starting body plan**, and validate sustained swimming and controllable steering across different brains. Following 33 physical fin/tail combinations and 24 further phase/mirror variants, the promising genotype consists of the original tri-limb torso with **two additional axial tail joints and two real Y/Z articulated thin plates**, producing seven dynamic parts and 24 real, mutable neural outputs. It is introduced under the **new type `fin_tail`**, not by rewriting `tri_limb` or any saved DNA. The default 14-creature founder mix now spawns 5 planar, 5 serpent and 4 fin-tail creatures instead of using the almost-stationary old tri-limb slot.
