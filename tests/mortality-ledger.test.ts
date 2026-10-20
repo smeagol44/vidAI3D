@@ -69,3 +69,21 @@ test('predator kills prey in the same tick even when prey was visited earlier', 
     assert.ok(Math.abs(s.getTelemetry().chemicalEnergyLedger.conservationResidual)<1e-5);
   }finally{s.dispose();}
 });
+
+test('parent-funded egg eligibility retains a construction-energy survival budget', () => {
+  const s=new WorldSimulation(42,0);
+  try {
+    s.clearFreeNutrients();s.targetNutrientCount=0;s.nutrientInflowPerSec=0;
+    const g=createFounderGenome('parent','Parent',new PRNG(3),'planar_swimmer');
+    const org=s.addOrganism(g,new THREE.Vector3(0,8,0));
+    org.ageSec=g.metabolism.reproduceCooldownSec+1;
+    const funding=viableEggFunding(g), tissue=constructionEnergy(g);
+    const before=org.reserves;
+    org.reserves=funding+tissue/2;
+    s.chemicalHeat+=before-org.reserves;
+    assert.equal(s.reproductionBlockReason(org),'Insufficient reserve after egg funding');
+    s.feedAllOrganisms(tissue/2+1);
+    assert.equal(s.reproductionBlockReason(org),null);
+    assert.ok(Math.abs(s.getTelemetry().chemicalEnergyLedger.conservationResidual)<1e-5);
+  }finally{s.dispose();}
+});

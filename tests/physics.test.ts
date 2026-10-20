@@ -8,6 +8,7 @@ import {PRNG} from '../sim/prng';
 import {measureReference} from '../sim/verification';
 import {WorldSimulation} from '../sim/simulation';
 import {SimulationClock} from '../sim/clock';
+import {founderReserve} from '../sim/energy';
 await initializePhysics();
 const gene=(type:'planar_swimmer'|'3d_serpent'|'tri_limb'='planar_swimmer')=>createFounderGenome('test',type,new PRNG(4242),type);
 const close=(a:number,b:number,tolerance=1e-5)=>assert.ok(Math.abs(a-b)<=tolerance,`${a} != ${b} (tolerance ${tolerance})`);
@@ -49,7 +50,7 @@ test('reference swims a body length with stable physical hinges, no contacts and
   const r=measureReference('planar_swimmer');
   assert.ok(r.finite);assert.ok(r.bodyLengths>=1,JSON.stringify(r));assert.ok(r.pathMeters>=r.netMeters);
   assert.ok(r.maxAnchorErrorMeters<.005);assert.ok(r.maxAxisErrorRadians<.01);assert.ok(r.maxLimitViolationRadians<.02);
-  assert.equal(r.contactSamples,0);assert.ok(r.reserves>0&&r.reserves<250);assert.ok(r.strokeDisplacementsMeters.length>=19);
+  assert.equal(r.contactSamples,0);assert.ok(r.reserves>0&&r.reserves<founderReserve(gene()));assert.ok(r.workJoules>0);assert.ok(r.strokeDisplacementsMeters.length>=19);
   console.log('Planar reference:',JSON.stringify(r));
 });
 

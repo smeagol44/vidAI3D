@@ -174,13 +174,18 @@ export class WorldSimulation {
     return added;
   }
 
+  /** Require enough post-egg reserve for continued physical survival. */
+  private parentSurvivalReserve(org: OrganismInstance): number {
+    return Math.max(50, org.structuralEnergy);
+  }
+
   public reproductionBlockReason(org: OrganismInstance): string | null {
     if (org.isDead || org.reserves <= 0) return 'Not alive';
     if (this.organisms.length + this.eggs.length >= this.maxOrganisms) return 'Population limit';
     if (org.ageSec - org.lastReproduceSec <= org.genome.metabolism.reproduceCooldownSec) return 'Reproduction cooldown';
     if (org.reserves <= org.genome.metabolism.reproduceReserveThreshold) return 'Below reproduction threshold';
     const funding = Math.max(org.genome.metabolism.eggEnergyFunding, viableEggFunding(org.genome));
-    if (org.reserves - funding < Math.max(50, org.structuralEnergy * .25)) return 'Insufficient reserve after egg funding';
+    if (org.reserves - funding < this.parentSurvivalReserve(org)) return 'Insufficient reserve after egg funding';
     return null;
   }
 
@@ -309,7 +314,7 @@ export class WorldSimulation {
           childGenome.generation = org.genome.generation + 1;
         }
         const funding = Math.max(org.genome.metabolism.eggEnergyFunding, Math.ceil(viableEggFunding(childGenome)));
-        if (org.reserves - funding >= Math.max(50, org.structuralEnergy * .25)) {
+        if (org.reserves - funding >= this.parentSurvivalReserve(org)) {
           org.reserves -= funding;
           org.totalEggFundingSpent += funding;
           org.lastReproduceSec = org.ageSec;
