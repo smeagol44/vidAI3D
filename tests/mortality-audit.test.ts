@@ -27,13 +27,13 @@ test('bounded production-world mortality baseline: live reserves and cause proxi
   });
   try {
     const records=[read(0)];
-    for(let i=1;i<=22*60;i++) {
+    for(let i=1;i<=45*60;i++) {
       sim.stepOuterTick();
       if (i%600===0 || i===45*60) records.push(read(i/60));
     }
     console.log('MORTALITY_CHECK_028',JSON.stringify(records));
     assert.ok(records.every(r=>Math.abs(r.residual)<1e-5));
-    assert.ok(records.every(r=>r.alive===14), 'funded founders should not starve in the first 22 simulated seconds');
+    assert.ok(records.filter(r=>r.at<=20).every(r=>r.alive===14), 'founders survive the first twenty simulated seconds');
     assert.ok(records[0].groups.filter(g=>g.parts===6).every(g=>g.initial===628));
     assert.ok(records[0].groups.filter(g=>g.parts===7).every(g=>g.initial===964));
   }finally {sim.dispose();}
