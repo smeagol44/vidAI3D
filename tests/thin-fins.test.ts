@@ -4,7 +4,7 @@ import * as THREE from 'three';
 import { initializePhysics, PhysicsWorld, RigidCuboid, PHYSICS_DT, cuboidResistance, faceAnchor } from '../sim/physics';
 import { WorldSimulation } from '../sim/simulation';
 import { bodyLayout, OrganismInstance } from '../sim/organism';
-import { partPhysicalSize, validateGenome, getMouthApertureLocal } from '../sim/genome';
+import { partPhysicalSize, validateGenome, getMouthApertureLocal, type VoxelPartGene } from '../sim/genome';
 import { createFounderGenome, mutateGenome } from '../sim/mutation';
 import { constructionEnergy } from '../sim/energy';
 import { PRNG } from '../sim/prng';
@@ -23,7 +23,7 @@ function finGenome() {
   g.parts=[g.parts[0],left,leftFin,right,rightFin];
   return g;
 }
-function rightFinDefinition(p:ReturnType<typeof finGenome>['parts'][number]) {
+function rightFinDefinition(p:VoxelPartGene) {
   return {...p,parentId:p.id,parentFace:'+Z' as const,attachFace:'-Z' as const,
     hingeAxis:'Z' as const,thicknessScaleY:.2,hasMouth:false,hasEye:false};
 }
