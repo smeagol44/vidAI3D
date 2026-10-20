@@ -27,11 +27,12 @@ jobs:
         run: |
           set -euo pipefail
           git clone --quiet "https://x-access-token:${WIKI_TOKEN}@github.com/${GITHUB_REPOSITORY}.wiki.git" "${RUNNER_TEMP}/vida3d-wiki"
-          cp -- docs/wiki/Home.md docs/wiki/_Sidebar.md docs/wiki/Interface-and-Controls.md docs/wiki/Audio-and-Music.md "${RUNNER_TEMP}/vida3d-wiki/"
+          # Every current source page is published, including newly maintained systems.
+          cp -- docs/wiki/*.md "${RUNNER_TEMP}/vida3d-wiki/"
           cd "${RUNNER_TEMP}/vida3d-wiki"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -- Home.md _Sidebar.md Interface-and-Controls.md Audio-and-Music.md
+          git add -- '*.md'
           if git diff --cached --quiet; then
             echo "The actual Wiki is already current."
             exit 0
