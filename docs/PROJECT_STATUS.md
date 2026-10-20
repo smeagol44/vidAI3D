@@ -8,6 +8,8 @@ A deterministic 45 simulated-second default 14-founder world on v0.2.7 had **14 
 
 **Causal observability:** lifetime basal/motor spending, egg funding and predation losses are separated from actual food gain. Starvation, physical-bite depletion and old-age deaths are counted and a bounded recent death history exposed; deaths are now processed *after all oral contacts* so an organism consumed late in a tick cannot erroneously survive that tick. The UI inspector and energy ledger expose these values in simulated seconds. A current-only Lifecycle-and-Energy Wiki page documents the implementation.
 
+**Same-horizon v0.2.8 result (seed 4242, 45 simulated seconds):** 15 living organisms, 3 deaths, 4 genuinely funded hatchings and 8 eggs remaining versus 9 living, 5 deaths and no eggs in v0.2.7. All 14 original founders survived through 20 seconds. In v0.2.8, 45-second genuine food absorption was ~319 chemical units and the world chemical residual was about -2×10⁻⁹ units. This is a limited measured improvement, not the end of the mortality or self-sustaining-population problem.
+
 **Limits:** Any later mortality still requires actual nutrition, locomotion and predator/prey improvements. These changes preserve the existing genome schema, including legacy tri-limb constructor. No change to VIDA 2D or nonphysical survival mechanism.
 
 ## 2026-10-20 — v0.2.7 Phase A: UI identity, audio looping and current Wiki source
