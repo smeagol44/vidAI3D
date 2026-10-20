@@ -111,13 +111,13 @@ export const CONFIG = {
 
   // Hydrodynamics & Eco Simulation
   waterDragCoeff: {
-    value: 3.5,
+    value: 250,
     type: 'number',
     label: 'Water Drag Coeff (mu)',
     group: 'Physics',
-    min: 0.5,
-    max: 10,
-    step: 0.5,
+    min: 0,
+    max: 1000,
+    step: 50,
   },
   nutrientInflow: {
     value: 15,

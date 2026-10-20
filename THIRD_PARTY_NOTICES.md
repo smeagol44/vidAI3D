@@ -120,3 +120,8 @@ SOFTWARE.
 
 _This file lists third-party components only. The license governing your
 application itself is provided separately in `LICENSE` / `LICENSE.md`.
+
+
+## Rapier core added in VIDA 3D 0.2.0
+
+`@dimforge/rapier3d-compat` **0.21.0**, including its bundled WebAssembly physics engine, is licensed under **Apache-2.0**. The full upstream license is retained in [licenses/rapier-LICENSE](licenses/rapier-LICENSE). Upstream: https://github.com/dimforge/rapier.js and https://rapier.rs/. This core dependency is distinct from the MIT-licensed React wrapper listed in the original export notices; VIDA 3D uses the core directly.

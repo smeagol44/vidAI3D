@@ -33,6 +33,7 @@ import { Game } from './Game';
 import { OrganismGenome } from './sim/genome';
 import { createFounderGenome } from './sim/mutation';
 import { WorldSimulation } from './sim/simulation';
+import { SimulationClock, OUTER_DT } from './sim/clock';
 import { runLocomotionAndPhysicsVerification, VerificationReport } from './sim/verification';
 import { formatTime, gameAudio, GameState, MenuOverlay, Overlay, useAutoFocus, useIsMobile } from './utils';
 import BackgroundMusic from './utils/BackgroundMusic';
@@ -83,7 +84,7 @@ export default function App() {
   const [savedSpecimens, setSavedSpecimens] = useState<OrganismGenome[]>([]);
 
   // Telemetry tick update state
-  const [telemetry, setTelemetry] = useState(simRef.current.getTelemetry(60, 120, 1.0));
+  const [telemetry, setTelemetry] = useState(simRef.current.getTelemetry(0, 0, 0));
   const [synapseThreshold, setSynapseThreshold] = useState(0.2);
 
   // Playground SDK Lifecycle
@@ -93,80 +94,39 @@ export default function App() {
     (window as CustomWindow).canHandleBackKey = ['PLAYING', 'PAUSED'].includes(gameState.status);
   }, [gameState.status]);
 
-  // Main Fixed-Step Simulation Loop with Real-Time Accumulator
+  const clockRef = useRef<SimulationClock | null>(null);
+  if(!clockRef.current) clockRef.current=new SimulationClock();
+  const uiPauseRef=useRef(false);
+  uiPauseRef.current=isMenuOpen||isHowToPlayOpen;
+
+  // Physics runs on fixed ticks; React receives bounded telemetry snapshots only.
   useEffect(() => {
-    let animationFrameId: number;
-    let lastRealTime = performance.now();
-    let timeAccumulator = 0;
-    let renderFrameCount = 0;
-    let physicsSubstepsThisSec = 0;
-    let simulatedSecsThisSec = 0;
-    let fpsTimer = performance.now();
-    let currentFps = 60;
-    let measuredPhysicsThroughput = 120;
-    let achievedSpeedRatio = 1.0;
-
-    const loop = (now: number) => {
-      const dtReal = Math.min((now - lastRealTime) / 1000, 0.1);
-      lastRealTime = now;
-
-      renderFrameCount++;
-
-      if (now - fpsTimer >= 1000) {
-        currentFps = renderFrameCount;
-        measuredPhysicsThroughput = physicsSubstepsThisSec;
-        achievedSpeedRatio = simulatedSecsThisSec;
-        renderFrameCount = 0;
-        physicsSubstepsThisSec = 0;
-        simulatedSecsThisSec = 0;
-        fpsTimer = now;
+    let frameId=0, last=performance.now(), intervalStart=last, lastPublish=last;
+    let frames=0, substeps=0, simulated=0, fps=0, throughput=0, achieved=0;
+    const loop=(now:number)=>{
+      const elapsed=(now-last)/1000; last=now; frames++;
+      const sim=simRef.current!;
+      const ticks=clockRef.current!.advance(elapsed,gameStateRef.current.status==='PLAYING'&&!uiPauseRef.current,
+        gameStateRef.current.speed||1,dt=>sim.stepOuterTick(dt));
+      substeps+=ticks*2; simulated+=ticks*OUTER_DT;
+      if(now-intervalStart>=1000) {
+        const seconds=(now-intervalStart)/1000;
+        fps=Math.round(frames/seconds); throughput=Math.round(substeps/seconds); achieved=simulated/seconds;
+        frames=0;substeps=0;simulated=0;intervalStart=now;
       }
-
-      if (gameStateRef.current.status === 'PLAYING' && !isMenuOpen && !isHowToPlayOpen && simRef.current) {
-        const sim = simRef.current;
-        const requestedSpeed = gameStateRef.current.speed || 1;
-        const outerDt = 1 / 60;
-
-        if (requestedSpeed === 99) {
-          // MAX mode: computation budgeted steps per frame (up to 8 outer ticks)
-          for (let s = 0; s < 8; s++) {
-            sim.stepOuterTick(outerDt);
-            physicsSubstepsThisSec += 2;
-            simulatedSecsThisSec += outerDt;
-          }
-        } else {
-          // Normal real-time accumulator mode
-          timeAccumulator += dtReal * requestedSpeed;
-          const maxStepsPerFrame = Math.max(1, Math.min(12, Math.ceil(requestedSpeed * 4)));
-          let stepsTaken = 0;
-
-          while (timeAccumulator >= outerDt && stepsTaken < maxStepsPerFrame) {
-            sim.stepOuterTick(outerDt);
-            timeAccumulator -= outerDt;
-            stepsTaken++;
-            physicsSubstepsThisSec += 2;
-            simulatedSecsThisSec += outerDt;
-          }
-          if (timeAccumulator > outerDt * 4) {
-            timeAccumulator = 0; // Prevent spiral of death backlog
-          }
-        }
-
-        const tele = sim.getTelemetry(currentFps, measuredPhysicsThroughput, achievedSpeedRatio);
-        setTelemetry(tele);
-        setGameState((prev) => ({
-          ...prev,
-          score: tele.highestGeneration * 100 + tele.totalBirths * 10,
-          level: tele.highestGeneration,
-        }));
+      if(now-lastPublish>=100) {
+        const tele=sim.getTelemetry(fps,throughput,achieved); setTelemetry(tele);
+        setGameState(prev=>{
+          const score=tele.highestGeneration*100+tele.totalBirths*10;
+          return prev.score===score&&prev.level===tele.highestGeneration?prev:{...prev,score,level:tele.highestGeneration};
+        });
+        lastPublish=now;
       }
-
-      animationFrameId = requestAnimationFrame(loop);
+      frameId=requestAnimationFrame(loop);
     };
-
-    animationFrameId = requestAnimationFrame(loop);
-    return () => cancelAnimationFrame(animationFrameId);
-  }, [isMenuOpen, isHowToPlayOpen]);
+    frameId=requestAnimationFrame(loop);
+    return()=>cancelAnimationFrame(frameId);
+  },[]);
 
   // Keyboard Shortcuts
   useEffect(() => {
@@ -194,6 +154,7 @@ export default function App() {
   }, [gameState.status, isHowToPlayOpen, isVerificationOpen]);
 
   const initSimulation = useCallback(() => {
+    clockRef.current?.reset();
     if (simRef.current) {
       simRef.current.reset(14);
     }
@@ -214,7 +175,7 @@ export default function App() {
       sim.prng.range(4, sim.tankBounds.y - 4),
       sim.prng.range(-sim.tankBounds.z * 0.3, sim.tankBounds.z * 0.3)
     );
-    sim.addOrganism(genome, spawnPos);
+    try { sim.addOrganism(genome, spawnPos); } catch(error) { console.warn(error); return; }
     gameAudio.playConfirmSelect();
   };
 
@@ -267,7 +228,7 @@ export default function App() {
             <span>•</span>
             <span className="text-amber-300">Gen: {telemetry.highestGeneration}</span>
             <span>•</span>
-            <span className="text-slate-300 font-mono">Phys: {telemetry.physicsThroughput} Hz ({telemetry.fps} FPS)</span>
+            <span className="text-slate-300 font-mono">Phys: {telemetry.physicsThroughput} Hz ({telemetry.fps} FPS) · {telemetry.achievedSimSpeed.toFixed(1)}× achieved</span>
           </div>
         </div>
 
@@ -776,7 +737,7 @@ export default function App() {
                       <button
                         onClick={() => {
                           if (simRef.current) {
-                            simRef.current.addOrganism(specimen, new THREE.Vector3(0, 8, 0));
+                            try { simRef.current.addOrganism(specimen, new THREE.Vector3(0, 8, 0)); } catch(error) { console.warn(error); return; }
                             gameAudio.playPowerupChime();
                           }
                         }}

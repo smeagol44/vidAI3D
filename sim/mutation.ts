@@ -194,6 +194,21 @@ export function createFounderGenome(id: string, name: string, prng: PRNG, type: 
     });
   }
 
+  // Named inherited gaits calibrated with SI cuboid inertia and normal-only water resistance.
+  // Existing/custom genomes are not rewritten; these settings define newly created founders.
+  if(type === 'planar_swimmer') {
+    for(const [i,p] of parts.entries()) { p.dimX=1; p.dimY=1; p.dimZ=3; p.motorPhase=i*Math.PI/2; }
+  }
+  if(type === '3d_serpent') {
+    parts.push({...parts[2],id:'part-3',parentId:'part-2'});
+    for(const [i,p] of parts.entries()) {
+      p.dimX=1; p.dimY=1; p.dimZ=3; p.minAngle=-Math.PI/3; p.maxAngle=Math.PI/3;
+      p.hingeAxis=i===2?'X':'Y'; p.motorPhase=[0,0,Math.PI/2,Math.PI/2][i];
+    }
+  }
+  if(type === 'tri_limb') parts[2].motorPhase=parts[1].motorPhase+Math.PI/2;
+  for(const p of parts) { p.motorFrequency=.65; p.motorMaxTorque=400; }
+
   const hiddenCount = 24;
   const timeConstants: number[] = [];
   const biases: number[] = [];
@@ -293,7 +308,7 @@ export function mutateGenome(parent: OrganismGenome, prng: PRNG, newId: string):
       p.motorPhase = (p.motorPhase + prng.range(-0.4, 0.4) + Math.PI * 2) % (Math.PI * 2);
     }
     if (prng.next() < 0.25) {
-      p.motorMaxTorque = THREE.MathUtils.clamp(p.motorMaxTorque + prng.range(-3, 3), 5, 50);
+      p.motorMaxTorque = THREE.MathUtils.clamp(p.motorMaxTorque + prng.range(-30, 30), 50, 800);
     }
   }
 
@@ -318,7 +333,7 @@ export function mutateGenome(parent: OrganismGenome, prng: PRNG, newId: string):
       minAngle: -Math.PI / 3,
       maxAngle: Math.PI / 3,
       restAngle: 0,
-      motorMaxTorque: prng.range(15, 30),
+      motorMaxTorque: prng.range(200, 400),
       motorFrequency: prng.range(0.8, 1.8),
       motorPhase: prng.range(0, Math.PI * 2),
       hasMouth: false,

@@ -5,7 +5,7 @@ export interface VoxelPartGene {
   parentId: string | null;
   attachFace: FaceDirection | null; // Face of parent to attach to
   parentFace: FaceDirection | null;
-  // Integer dimensions N x M x P in local voxel grid units (0.2m per voxel)
+  // Integer dimensions N x M x P in local voxel grid units (0.3m per voxel)
   dimX: number; // e.g. 1 to 4
   dimY: number; // e.g. 1 to 4
   dimZ: number; // e.g. 1 to 4

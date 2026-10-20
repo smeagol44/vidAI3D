@@ -3,6 +3,7 @@ import React, { Suspense, useEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import { getConfig } from './constants';
 import { WorldSimulation } from './sim/simulation';
+import type { RigidCuboid } from './sim/physics';
 import { getMouthApertureLocal } from './sim/genome';
 import { GameState } from './utils/helper';
 
@@ -86,6 +87,12 @@ function AquariumEnvironment({ bounds }: { bounds: THREE.Vector3 }) {
       </points>
     </group>
   );
+}
+
+function BodyTransform({body,children}:{body:RigidCuboid;children:React.ReactNode}) {
+  const ref=useRef<THREE.Group>(null);
+  useFrame(()=>{if(ref.current){ref.current.position.copy(body.pos);ref.current.quaternion.copy(body.rot);}});
+  return <group ref={ref} position={body.pos.toArray()} quaternion={body.rot.toArray() as any}>{children}</group>;
 }
 
 function SceneEntities({
@@ -175,10 +182,7 @@ function SceneEntities({
                 const sizeZ = body.dimZ;
 
                 return (
-                  <group
-                    key={body.id}
-                    position={body.pos.toArray()}
-                    quaternion={body.rot.toArray() as any}>
+                  <BodyTransform key={body.id} body={body}>
                     {/* Main Part Cuboid */}
                     <mesh castShadow receiveShadow>
                       <boxGeometry args={[sizeX, sizeY, sizeZ]} />
@@ -262,7 +266,7 @@ function SceneEntities({
                         </mesh>
                       </group>
                     )}
-                  </group>
+                  </BodyTransform>
                 );
               })}
 
