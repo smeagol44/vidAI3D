@@ -322,6 +322,14 @@ export function mutateGenome(parent: OrganismGenome, prng: PRNG, newId: string):
       if (dimChoice === 1) p.dimY = THREE.MathUtils.clamp(p.dimY + (prng.next() < 0.5 ? -1 : 1), 1, 4);
       if (dimChoice === 2) p.dimZ = THREE.MathUtils.clamp(p.dimZ + (prng.next() < 0.5 ? -1 : 1), 1, 4);
     }
+    // Optional fin thickness is heritable and can both grow and shrink.
+    // Local-Y only for now; the existing integer voxel dimensions remain
+    // unchanged unless a physical plate trait evolves.
+    if (p.parentId !== null && prng.next() < 0.1) {
+      const next = THREE.MathUtils.clamp((p.thicknessScaleY ?? 1) + prng.range(-0.2, 0.2), 0.15, 1);
+      if (next >= 0.999) delete p.thicknessScaleY;
+      else p.thicknessScaleY = next;
+    }
     if (prng.next() < 0.3) {
       p.motorFrequency = THREE.MathUtils.clamp(p.motorFrequency + prng.range(-0.15, 0.15), 0.2, 3.0);
     }

@@ -4,6 +4,8 @@
 
 > **Current live locomotion:** v0.2.3 uses six-link planar/nonplanar founding gaits and a six-link serpent with an X hinge. See [PROJECT_STATUS.md](PROJECT_STATUS.md) for the real recurrent-brain speed benchmarks. The original v0.2.0 3- and 4-link reference anatomy, measurements and calibration tables below remain historical records; they are not the current founder defaults.
 
+> **v0.2.4 thin plates:** An optional inherited local-Y physical thickness multiplier (0.15–1) now permits real sub-voxel thin cuboids without changing voxel-grid X/Z dimensions. Rapier density, normal-only drag, rest OBB collision, face anchors, rendering, mouth offsets and energy construction all use the physical dimension. See [THIN_FINS.md](THIN_FINS.md). No founder speed-up is claimed from the feature.
+
 Rapier 0.21.0 replaces the custom rigid-body integrator and constraint solver. Every part, including the root, is dynamic in one shared ecosystem world. Rapier owns poses and velocities; rendering and senses read snapshots. Physics uses metres, seconds, kilograms, newtons and newton-metres, with zero gravity and initially still water.
 
 Both attachment faces determine the rest orientation and coincident anchors. Separate local hinge frames preserve the same world axis even when attachment faces differ. Rest geometry is validated before construction. Physical joints enforce anchors and limits. Only adjacent connected-body contacts are disabled; other bodies and all six walls participate in contacts. CCD is enabled, though the tests do not establish universal collision robustness for every possible evolved anatomy.

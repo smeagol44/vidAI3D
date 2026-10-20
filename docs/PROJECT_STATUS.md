@@ -1,5 +1,15 @@
 # VIDA 3D project status
 
+## 2026-10-20 — v0.2.4 physically thin inheritable fin foundation (speed still unresolved)
+
+Following the user's suggestion to make creature parts **thinner yet wider**, we implemented optional continuous physical thickness on local Y, from 15% to 100% of an integer voxel unit, propagated consistently through Rapier collider mass and inertia, real integrated normal-only water drag, attachment anchors, rest-body overlap/spawn clearance, tissue construction energy, visuals and mouth placement. The field is optional and inherited; old genomes and all existing founder shapes remain unchanged. Non-root thickness can mutate in descendants. Selected-organism anatomy now reports actual centimetre dimensions for thin parts.
+
+A physically articulated fin can use two chained perpendicular Y/Z revolute hinges with separate genetically controlled neural motor outputs. Production-code tests cover finite bodies and dual-axis articulation, proper physical thickness/energy, mutation and the live ecosystem chemical ledger. CI must pass before merging. See [THIN_FINS.md](THIN_FINS.md) for the detailed contract and measured negative performance evidence.
+
+**Critical limitation:** These capabilities do **not yet** make the three-limbed founder swim quickly. In 7-second controlled recurrent-brain trials, a 0.06m plate managed at most **0.0049m of forward travel** across three phase choices; the tested 0.15m and 0.30m plates did not exceed ~0.009m and 0.013m, respectively. Some very thin variants consumed 70–105 reserve units. Previous broad-fin shape sweeps similarly failed to achieve efficient net motion. Accordingly the v0.2.3 planar/serpent founder gaits, physics, water resistance coefficient, and default tri-limb are **not** replaced by unproven plates. The appropriate next locomotion phase is power/recovery stroke asymmetry and carefully measured fin feather-control coordination, with net COM body lengths and chemical cost as the acceptance metrics.
+
+No manual browser/WebGL QA and **no changes to the separate 2D `smeagol44/vidAI` repo**.
+
 ## 2026-10-20 — v0.2.3 measured live swimming speed improvements
 
 **Reason for this phase:** After the v0.2.2 movement/energy fixes, the user still found locomotion *extremely slow* and prioritized speed over feeding/perception. Only `smeagol44/vidAI3D` was modified. The physics state, Rapier joints, analytical normal-only cuboid resistance and chemical energy accounting remain authoritative. No position steering, fabricated forces, genome retrofits or hidden refills.

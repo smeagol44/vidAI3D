@@ -8,6 +8,8 @@ export interface VoxelPartGene {
   // Integer dimensions N x M x P in local voxel grid units (0.3m per voxel)
   dimX: number; // e.g. 1 to 4
   dimY: number; // e.g. 1 to 4
+  /** Optional inherited physical thickness multiplier along local Y (0.15..1). One voxel stays the structural grid unit. */
+  thicknessScaleY?: number;
   dimZ: number; // e.g. 1 to 4
   // Joint definition relative to parent connection
   hingeAxis: 'X' | 'Y' | 'Z';
@@ -55,6 +57,12 @@ export interface OrganismGenome {
 }
 
 export const VOXEL_UNIT = 0.3; // 1 integer voxel = 0.3 meters
+export const MIN_THICKNESS_SCALE_Y = 0.15;
+
+/** Authoritative shape for physics, rendering, collision, joints, and feeding. */
+export function partPhysicalSize(p: Pick<VoxelPartGene,'dimX'|'dimY'|'dimZ'|'thicknessScaleY'>): [number,number,number] {
+  return [p.dimX * VOXEL_UNIT, p.dimY * VOXEL_UNIT * (p.thicknessScaleY ?? 1), p.dimZ * VOXEL_UNIT];
+}
 
 export interface MouthApertureData {
   localPos: THREE.Vector3;
@@ -75,10 +83,12 @@ export function getMouthApertureLocal(
   face: FaceDirection,
   dimX: number,
   dimY: number,
-  dimZ: number
+  dimZ: number,
+  thicknessScaleY = 1
 ): MouthApertureData {
   const halfX = (dimX * VOXEL_UNIT) / 2;
-  const halfY = (dimY * VOXEL_UNIT) / 2;
+  const physicalY = dimY * thicknessScaleY;
+  const halfY = (physicalY * VOXEL_UNIT) / 2;
   const halfZ = (dimZ * VOXEL_UNIT) / 2;
 
   const localPos = new THREE.Vector3();
@@ -94,16 +104,16 @@ export function getMouthApertureLocal(
       localNormal.set(1, 0, 0);
       localEuler.set(0, Math.PI / 2, 0);
       plateWidth = dimZ * VOXEL_UNIT * 0.6;
-      plateHeight = dimY * VOXEL_UNIT * 0.5;
-      radius = Math.max(0.3, Math.min(dimY, dimZ) * VOXEL_UNIT * 0.5 + 0.15);
+      plateHeight = physicalY * VOXEL_UNIT * 0.5;
+      radius = Math.max(0.3, Math.min(physicalY, dimZ) * VOXEL_UNIT * 0.5 + 0.15);
       break;
     case '-X':
       localPos.set(-halfX - 0.02, 0, 0);
       localNormal.set(-1, 0, 0);
       localEuler.set(0, -Math.PI / 2, 0);
       plateWidth = dimZ * VOXEL_UNIT * 0.6;
-      plateHeight = dimY * VOXEL_UNIT * 0.5;
-      radius = Math.max(0.3, Math.min(dimY, dimZ) * VOXEL_UNIT * 0.5 + 0.15);
+      plateHeight = physicalY * VOXEL_UNIT * 0.5;
+      radius = Math.max(0.3, Math.min(physicalY, dimZ) * VOXEL_UNIT * 0.5 + 0.15);
       break;
     case '+Y':
       localPos.set(0, halfY + 0.02, 0);
@@ -126,8 +136,8 @@ export function getMouthApertureLocal(
       localNormal.set(0, 0, 1);
       localEuler.set(0, Math.PI, 0);
       plateWidth = dimX * VOXEL_UNIT * 0.6;
-      plateHeight = dimY * VOXEL_UNIT * 0.5;
-      radius = Math.max(0.3, Math.min(dimX, dimY) * VOXEL_UNIT * 0.5 + 0.15);
+      plateHeight = physicalY * VOXEL_UNIT * 0.5;
+      radius = Math.max(0.3, Math.min(dimX, physicalY) * VOXEL_UNIT * 0.5 + 0.15);
       break;
     case '-Z':
     default:
@@ -135,8 +145,8 @@ export function getMouthApertureLocal(
       localNormal.set(0, 0, -1);
       localEuler.set(0, 0, 0);
       plateWidth = dimX * VOXEL_UNIT * 0.6;
-      plateHeight = dimY * VOXEL_UNIT * 0.5;
-      radius = Math.max(0.3, Math.min(dimX, dimY) * VOXEL_UNIT * 0.5 + 0.15);
+      plateHeight = physicalY * VOXEL_UNIT * 0.5;
+      radius = Math.max(0.3, Math.min(dimX, physicalY) * VOXEL_UNIT * 0.5 + 0.15);
       break;
   }
 
@@ -168,7 +178,8 @@ export function isContactingMouthAperture(
  * A face is narrow/neutral if its normal axis has length at least as large as both other local dimensions.
  * Otherwise it is broad. Reject broad-to-broad connections.
  */
-export function isBroadFace(face: FaceDirection, dimX: number, dimY: number, dimZ: number): boolean {
+export function isBroadFace(face: FaceDirection, dimX: number, dimY: number, dimZ: number, thicknessScaleY = 1): boolean {
+  dimY *= thicknessScaleY;
   if (dimX === dimY && dimY === dimZ) return false; // Cubes are neutral on every face
   if (face === '+X' || face === '-X') {
     return dimX < dimY || dimX < dimZ;
@@ -191,7 +202,9 @@ export function validateGenome(genome: OrganismGenome): boolean {
   for (const part of genome.parts) {
     if (partIds.has(part.id)) return false;
     partIds.add(part.id);
+    if (![part.dimX,part.dimY,part.dimZ].every(Number.isInteger)) return false;
     if (part.dimX < 1 || part.dimY < 1 || part.dimZ < 1) return false;
+    if (part.thicknessScaleY !== undefined && (!Number.isFinite(part.thicknessScaleY) || part.thicknessScaleY < MIN_THICKNESS_SCALE_Y || part.thicknessScaleY > 1)) return false;
     if (part.dimX > 5 || part.dimY > 5 || part.dimZ > 5) return false;
   }
 
@@ -200,8 +213,8 @@ export function validateGenome(genome: OrganismGenome): boolean {
     if (part.parentId !== null) {
       const parent = genome.parts.find((p) => p.id === part.parentId);
       if (!parent || !part.parentFace || !part.attachFace) return false;
-      const parentBroad = isBroadFace(part.parentFace, parent.dimX, parent.dimY, parent.dimZ);
-      const childBroad = isBroadFace(part.attachFace, part.dimX, part.dimY, part.dimZ);
+      const parentBroad = isBroadFace(part.parentFace, parent.dimX, parent.dimY, parent.dimZ, parent.thicknessScaleY);
+      const childBroad = isBroadFace(part.attachFace, part.dimX, part.dimY, part.dimZ, part.thicknessScaleY);
       if (parentBroad && childBroad) return false;
     }
   }

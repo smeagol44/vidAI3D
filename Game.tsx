@@ -188,7 +188,8 @@ function SceneEntities({
                         body.partGene.mouthFace || '-Z',
                         body.partGene.dimX,
                         body.partGene.dimY,
-                        body.partGene.dimZ
+                        body.partGene.dimZ,
+                        body.partGene.thicknessScaleY
                       );
                       const diet = body.partGene.mouthDiet;
                       // 2D VIDA matching colors: Green herbivore (#22c55e), Red carnivore (#ef4444), Purple omnivore (#a855f7)
