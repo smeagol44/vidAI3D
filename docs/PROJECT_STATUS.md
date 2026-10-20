@@ -1,5 +1,15 @@
 # VIDA 3D project status
 
+## 2026-10-20 — v0.2.5 evolvable physical fin power/recovery stroke
+
+The user prioritized sustained faster VIDA 3D locomotion rather than progressing to feeding and perception. After v0.2.4 delivered actual physical thin plates but inefficient fin swimming, this phase added **optional inherited motor stroke duty** (0.2–0.8, legacy 0.5 exactly sinusoidal) and **optional powered recovery feather pitch** (up to ±π/2) on joint genes. Both control real Rapier revolute motors, not position steering. The plate target is coordinated to its stalk's phase and still responds to the child's independent live neural frequency output, with retained motor torque/energy and original normal-only cuboid resistance. Both traits mutate in thin-fin lineages; invalid imported values are rejected before physics construction.
+
+**Controlled 20s physics/brain/energy benchmark with identical custom five-part fin geometry:** the legacy sinusoidal stroke traveled **0.2443 m net**, used **229.32 reserve units**, and traveled **-0.1986 m along Z**. The opposite-handed feathered power/return phenotype traveled **0.4232 m net**, spent **151.69 reserve units**, and traveled **-0.3657 m along Z**. Thus net travel +73%, chemical expenditure -34%, and net travel/energy >2.6× in this one fixture; maximum hinge anchor errors were under 1 mm and both energy ledgers closed to ~1e-11 units. The body also drifts vertically and laterally: this does **not** establish reliable directed foraging, navigation or viable population-level swimming.
+
+The mutation and UI inspection paths now expose these optional settings. Existing six-link planar and serpent swimmers and the old slow three-limb founder are unchanged; we did not silently replace starter DNA with this unproven special-purpose rig. Normal old sine oscillators are preserved under absent genes, and a same-geometry regression fails if net travel, signed longitudinal progress, or reserve efficiency regress. Full findings and limitations: [FIN_POWER_RECOVERY.md](FIN_POWER_RECOVERY.md). No browser/visual QA was attempted.
+
+**Strict repo boundary:** only `smeagol44/vidAI3D` was changed; 2D VIDA was not accessed for modifications.
+
 ## 2026-10-20 — v0.2.4 physically thin inheritable fin foundation (speed still unresolved)
 
 Following the user's suggestion to make creature parts **thinner yet wider**, we implemented optional continuous physical thickness on local Y, from 15% to 100% of an integer voxel unit, propagated consistently through Rapier collider mass and inertia, real integrated normal-only water drag, attachment anchors, rest-body overlap/spawn clearance, tissue construction energy, visuals and mouth placement. The field is optional and inherited; old genomes and all existing founder shapes remain unchanged. Non-root thickness can mutate in descendants. Selected-organism anatomy now reports actual centimetre dimensions for thin parts.
