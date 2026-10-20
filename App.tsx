@@ -181,10 +181,7 @@ export default function App() {
 
   const handleFeedAll = () => {
     if (!simRef.current) return;
-    for (const org of simRef.current.organisms) {
-      org.reserves += 60;
-    }
-    simRef.current.externalEnergyAdded += simRef.current.organisms.length * 60;
+    simRef.current.feedAllOrganisms(60);
     gameAudio.playPotionGulp();
   };
 
@@ -378,7 +375,7 @@ export default function App() {
             <div className="grid grid-cols-2 gap-2 bg-slate-900/80 p-2.5 rounded-xl border border-slate-800">
               <div>
                 <span className="text-slate-400 text-[11px] block">Reserves</span>
-                <span className="font-bold text-emerald-400 text-sm">{Math.round(selectedOrg.reserves)} J</span>
+                <span className="font-bold text-emerald-400 text-sm">{Math.round(selectedOrg.reserves)} / {Math.round(selectedOrg.reserveCapacity)} energy</span>
               </div>
               <div>
                 <span className="text-slate-400 text-[11px] block">Generation</span>
@@ -398,7 +395,15 @@ export default function App() {
               </div>
               <div>
                 <span className="text-slate-400 text-[11px] block">Mechanical Work</span>
-                <span className="font-mono text-slate-200">{Math.round(selectedOrg.totalWorkJoules)} J</span>
+                <span className="font-mono text-slate-200">{Math.round(selectedOrg.totalWorkJoules)} physical J</span>
+              </div>
+              <div>
+                <span className="text-slate-400 text-[11px] block">Body construction</span>
+                <span className="font-mono text-slate-200">{Math.round(selectedOrg.structuralEnergy)} energy</span>
+              </div>
+              <div>
+                <span className="text-slate-400 text-[11px] block">Egg eligibility</span>
+                <span className="font-mono text-slate-200">{simRef.current?.reproductionBlockReason(selectedOrg) ?? 'Ready to lay'}</span>
               </div>
             </div>
 
@@ -674,27 +679,41 @@ export default function App() {
             <div className="space-y-2 font-mono">
               <div className="flex justify-between py-1 border-b border-slate-900">
                 <span className="text-slate-400">Total External Input:</span>
-                <span className="text-slate-200 font-bold">{telemetry.chemicalEnergyLedger.totalInput} J</span>
+                <span className="text-slate-200 font-bold">{Math.round(telemetry.chemicalEnergyLedger.totalInput)} energy</span>
               </div>
               <div className="flex justify-between py-1 border-b border-slate-900">
                 <span className="text-slate-400">Organism Reserves:</span>
-                <span className="text-emerald-400">{telemetry.chemicalEnergyLedger.organismReserves} J</span>
+                <span className="text-emerald-400">{Math.round(telemetry.chemicalEnergyLedger.organismReserves)} energy</span>
               </div>
               <div className="flex justify-between py-1 border-b border-slate-900">
                 <span className="text-slate-400">Organism Tissue:</span>
-                <span className="text-cyan-400">{telemetry.chemicalEnergyLedger.organismTissue} J</span>
+                <span className="text-cyan-400">{Math.round(telemetry.chemicalEnergyLedger.organismTissue)} energy</span>
               </div>
               <div className="flex justify-between py-1 border-b border-slate-900">
                 <span className="text-slate-400">Egg Energy:</span>
-                <span className="text-amber-400">{telemetry.chemicalEnergyLedger.eggEnergy} J</span>
+                <span className="text-amber-400">{Math.round(telemetry.chemicalEnergyLedger.eggEnergy)} energy</span>
               </div>
               <div className="flex justify-between py-1 border-b border-slate-900">
                 <span className="text-slate-400">Nutrients in Water:</span>
-                <span className="text-emerald-300">{telemetry.chemicalEnergyLedger.nutrientEnergy} J</span>
+                <span className="text-emerald-300">{Math.round(telemetry.chemicalEnergyLedger.nutrientEnergy)} energy</span>
               </div>
               <div className="flex justify-between py-1">
-                <span className="text-slate-400">Dissipated Metabolic Work:</span>
-                <span className="text-rose-400">{telemetry.chemicalEnergyLedger.dissipatedMetabolicWork} J</span>
+                <span className="text-slate-400">Chemical heat / losses:</span>
+                <span className="text-rose-400">{Math.round(telemetry.chemicalEnergyLedger.dissipatedMetabolicWork)} energy</span>
+              </div>
+              <div className="flex justify-between py-1">
+                <span className="text-slate-400">External removals:</span>
+                <span className="text-amber-300">{Math.round(telemetry.chemicalEnergyLedger.externalRemovals)} energy</span>
+              </div>
+              <div className="flex justify-between py-1">
+                <span className="text-slate-400">Physical motor work:</span>
+                <span className="text-slate-200">{Math.round(telemetry.chemicalEnergyLedger.mechanicalWorkJoules)} J</span>
+              </div>
+              <div className="flex justify-between py-1 border-t border-slate-700">
+                <span className="text-slate-200 font-bold">Conservation residual:</span>
+                <span className={Math.abs(telemetry.chemicalEnergyLedger.conservationResidual) < 0.01 ? 'text-emerald-400' : 'text-rose-400'}>
+                  {telemetry.chemicalEnergyLedger.conservationResidual.toFixed(3)} energy
+                </span>
               </div>
             </div>
           </div>
