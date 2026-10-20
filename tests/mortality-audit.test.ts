@@ -1,7 +1,10 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { WorldSimulation } from '../sim/simulation';
+import { initializePhysics } from '../sim/physics';
 import { basalUpkeepPerSecond } from '../sim/energy';
+
+await initializePhysics();
 
 test('bounded production-world mortality baseline: live reserves and cause proxies', () => {
   const sim = new WorldSimulation(4242, 14);
