@@ -1,0 +1,113 @@
+import assert from 'node:assert/strict';
+import { test } from 'node:test';
+import * as THREE from 'three';
+import { initializePhysics, PHYSICS_DT } from '../sim/physics';
+import { strokeWave, recoveryFeatherWeight } from '../sim/gait';
+import { createFounderGenome, mutateGenome } from '../sim/mutation';
+import { WorldSimulation } from '../sim/simulation';
+import { OrganismInstance } from '../sim/organism';
+import { validateGenome } from '../sim/genome';
+import { PRNG } from '../sim/prng';
+await initializePhysics();
+
+test('legacy stroke remains sinusoidal; power/recovery asymmetry is smooth and bounded',()=>{
+  for(let i=-200;i<200;i++){
+    const phase=i*.04;
+    assert.ok(Math.abs(strokeWave(phase,.5)-Math.sin(phase))<1e-12);
+    for(const duty of [.2,.3,.7,.8]){
+      const v=strokeWave(phase,duty);
+      assert.ok(Number.isFinite(v)&&Math.abs(v)<=1+1e-12);
+    }
+  }
+  assert.ok(recoveryFeatherWeight(0)<.01);
+  assert.ok(recoveryFeatherWeight(Math.PI)>.99);
+  assert.ok(recoveryFeatherWeight(2*Math.PI)<.01);
+  assert.ok(Math.abs(strokeWave(Math.PI/2,.3)-1)<1e-10);
+  assert.ok(Math.abs(strokeWave(3*Math.PI/2,.7)+1)<1e-10);
+});
+
+function fins(duty=.5, feather=0, width=2, legacy=false){
+  const g=createFounderGenome('recovery','tri_limb',new PRNG(4242),'tri_limb');
+  const [root,left,right]=g.parts;
+  for(const p of [left,right]){
+    p.dimX=1;p.dimY=1;p.dimZ=2;p.hingeAxis='Y';p.motorMaxTorque=800;
+    if(!legacy)p.motorStrokeDuty=duty;
+  }
+  left.motorPhase=0;right.motorPhase=Math.PI;
+  const leftTip={...left,id:'part-3',parentId:left.id,parentFace:'+Z' as const,attachFace:'-Z' as const,
+    hingeAxis:'Z' as const,minAngle:-Math.PI*.49,maxAngle:Math.PI*.49,
+    motorPhase:Math.PI*.5,dimZ:width,thicknessScaleY:.2,hasEye:false,hasMouth:false};
+  const rightTip={...right,id:'part-4',parentId:right.id,parentFace:'+Z' as const,attachFace:'-Z' as const,
+    hingeAxis:'Z' as const,minAngle:-Math.PI*.49,maxAngle:Math.PI*.49,
+    motorPhase:Math.PI*1.5,dimZ:width,thicknessScaleY:.2,hasEye:false,hasMouth:false};
+  if(!legacy) {leftTip.motorFeatherAngle=feather;rightTip.motorFeatherAngle=-feather;}
+  g.parts=[root,left,leftTip,right,rightTip];
+  assert.ok(validateGenome(g));
+  return g;
+}
+test('a feather hinge uses its parent phase, still consumes real motor work and respects limits',()=>{
+ const genome=fins(.32,1,2),o=new OrganismInstance(genome,new THREE.Vector3(0,8,0));
+ try {
+  assert.equal(o.joints.length,4);
+  // Positive parent stroke holds the blade close to its broad-face target.
+  o.joints[0].jointPhase=0;
+  o.joints[1].jointPhase=0;
+  o.preparePhysicsSubstep(PHYSICS_DT,250);
+  const duringPower=o.joints[1].targetAngle;
+  o.joints[0].jointPhase=Math.PI;
+  o.preparePhysicsSubstep(PHYSICS_DT,250);
+  const duringRecovery=o.joints[1].targetAngle;
+  assert.ok(duringRecovery-duringPower>.9,{duringRecovery,duringPower}.toString());
+  assert.ok(duringRecovery <= o.joints[1].maxAngle);
+  for(let i=0;i<240;i++)o.updatePhysicsSubstep();
+  assert.ok(o.totalWorkJoules>0);
+  assert.ok(o.joints.every(j=>j.anchorError<.005 && j.axisError<.01));
+ }finally{o.dispose();}
+});
+
+test('power stroke and recovery pitch are genetically inherited and can mutate',()=>{
+ const parent=fins(.3,1,2),old=JSON.stringify(parent);
+ let strokes=0,pitches=0;
+ for(let i=1;i<=100;i++){
+  const child=mutateGenome(parent,new PRNG(i), 'child-'+i);
+  if(child===parent)continue;
+  if(child.parts[1]?.motorStrokeDuty !== parent.parts[1].motorStrokeDuty)strokes++;
+  if(child.parts[2]?.motorFeatherAngle !== parent.parts[2].motorFeatherAngle)pitches++;
+ }
+ assert.equal(JSON.stringify(parent),old);
+ assert.ok(strokes>0&&pitches>0);
+ for(const invalid of [{motorStrokeDuty:0},{motorStrokeDuty:1},{motorStrokeDuty:NaN},{motorFeatherAngle:100},{motorFeatherAngle:Infinity}]){
+  const g=fins();Object.assign(g.parts[1],invalid);
+  assert.equal(validateGenome(g),false);
+ }
+});
+
+test('living full-ecosystem physical power/recovery candidates: signed progress and net/energy',()=>{
+ const options=[{duty:.5,feather:0,width:2,legacy:true}];
+ for(const duty of [.25,.35,.5,.65,.75])
+  for(const feather of [-1.2,-.6,.6,1.2])
+   options.push({duty,feather,width:2,legacy:false});
+ const records=[];
+ for(const p of options){
+  const sim=new WorldSimulation(4242,0);
+  try{
+   sim.clearFreeNutrients();sim.targetNutrientCount=0;sim.nutrientInflowPerSec=0;
+   const o=sim.addOrganism(fins(p.duty,p.feather,p.width,p.legacy),new THREE.Vector3(0,8,0));
+   const start=o.com.clone(),previous=start.clone(),startingEnergy=o.reserves;
+   let path=0,maxGap=0;
+   for(let n=0;n<600;n++){
+    sim.stepOuterTick();
+    path+=o.com.distanceTo(previous);previous.copy(o.com);
+    for(const j of o.joints)maxGap=Math.max(maxGap,j.anchorError);
+   }
+   const net=o.com.distanceTo(start),energy=startingEnergy-o.reserves;
+   records.push({...p,net,forward:o.com.z-start.z,lateral:o.com.x-start.x,path,
+    energy,travelPerEnergy:energy>0?net/energy:0,remain:o.reserves,
+    motorWork:o.totalWorkJoules,maxGap,
+    residual:sim.getTelemetry().chemicalEnergyLedger.conservationResidual});
+  }finally{sim.dispose();}
+ }
+ console.log('POWER_RECOVERY_GAIT_EVIDENCE',JSON.stringify(records));
+ assert.ok(records.every(r=>Number.isFinite(r.net)&&r.path>=r.net&&r.energy>0&&r.maxGap<.005
+  &&Math.abs(r.residual)<1e-5&&r.remain>0));
+});
