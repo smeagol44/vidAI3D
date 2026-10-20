@@ -330,6 +330,19 @@ export function mutateGenome(parent: OrganismGenome, prng: PRNG, newId: string):
       if (next >= 0.999) delete p.thicknessScaleY;
       else p.thicknessScaleY = next;
     }
+    // The ability to evolve different power/recovery timing is restricted
+    // initially to articulated plates, preserving older six-link swim priors.
+    if (p.parentId !== null && ((p.thicknessScaleY ?? 1) < 1 || p.motorStrokeDuty !== undefined)
+      && prng.next() < .2) {
+      p.motorStrokeDuty = THREE.MathUtils.clamp((p.motorStrokeDuty ?? .5) + prng.range(-.08, .08), .2, .8);
+    }
+    // The outer thin plate can evolve a pitch on the parent's return phase.
+    // No new thrust, position update or hidden energy credit is introduced.
+    if (p.parentId !== null && ((p.thicknessScaleY ?? 1) < 1 || p.motorFeatherAngle !== undefined)
+      && prng.next() < .2) {
+      p.motorFeatherAngle = THREE.MathUtils.clamp((p.motorFeatherAngle ?? 0) + prng.range(-.2, .2),
+        -Math.PI / 2, Math.PI / 2);
+    }
     if (prng.next() < 0.3) {
       p.motorFrequency = THREE.MathUtils.clamp(p.motorFrequency + prng.range(-0.15, 0.15), 0.2, 3.0);
     }

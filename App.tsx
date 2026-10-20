@@ -423,7 +423,13 @@ export default function App() {
                 ))}
                 {selectedOrg.joints.map((j, idx) => (
                   <div key={idx} className="flex justify-between items-center text-slate-300 bg-slate-950/50 px-2 py-1 rounded">
-                    <span>Joint #{idx + 1} ({j.child.partGene.hingeAxis}-axis)</span>
+                    <span>
+                      Joint #{idx + 1} ({j.child.partGene.hingeAxis}-axis)
+                      {j.child.partGene.motorStrokeDuty !== undefined &&
+                        <span className="text-sky-400 ml-1">power {Math.round(j.child.partGene.motorStrokeDuty * 100)}%</span>}
+                      {j.child.partGene.motorFeatherAngle !== undefined &&
+                        <span className="text-teal-400 ml-1">feather {(j.child.partGene.motorFeatherAngle * 180 / Math.PI).toFixed(0)}°</span>}
+                    </span>
                     <span className="font-mono text-cyan-400">
                       {(j.currentAngle * (180 / Math.PI)).toFixed(1)}° | err: {(j.anchorError * 1000).toFixed(2)}mm
                     </span>
