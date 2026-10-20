@@ -56,3 +56,21 @@ test('trilimb slow gait is measured without claiming an untested speed improveme
   assert.equal(tri.parts,3);
   assert.ok(Number.isFinite(tri.net)&&tri.gap<.005&&Math.abs(tri.residual)<1e-5);
 });
+
+test('full 14-creature seed remains finite and conserves energy as new mobile bodies swim',()=>{
+  const s=new WorldSimulation(4242,14);
+  try {
+    const starts=new Map(s.organisms.map(o=>[o.genome.id,o.com.clone()]));
+    for(let i=0;i<360;i++)s.stepOuterTick();
+    const observations=s.organisms.map(o=>({
+      id:o.genome.id,parts:o.bodies.length,net:o.com.distanceTo(starts.get(o.genome.id)!),
+      remainingReserve:o.reserves,maxAnchor:Math.max(0,...o.joints.map(j=>j.anchorError))
+    }));
+    console.log('POPULATION_SWIM_023',JSON.stringify({observations,time:s.simTime,
+      residual:s.getTelemetry().chemicalEnergyLedger.conservationResidual}));
+    assert.equal(s.organisms.length,14);
+    assert.ok(observations.every(o=>Number.isFinite(o.net)&&o.maxAnchor<.005&&o.remainingReserve>0));
+    assert.ok(Math.abs(s.getTelemetry().chemicalEnergyLedger.conservationResidual)<1e-5);
+    assert.ok(observations.some(o=>o.parts===6&&o.net>.2),'at least one mobile founder must traverse space in the full tank');
+  } finally {s.dispose();}
+});
