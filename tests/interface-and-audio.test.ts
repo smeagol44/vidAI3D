@@ -30,5 +30,11 @@ test('decoded audio loop trims silence and crossfades at bounded sample points',
   assert.ok(loop.loopStartSec > 0 && loop.loopEndSec <= source.duration);
   assert.ok(loop.loopEndSec - loop.loopStartSec > 0);
   const data = loop.buffer.getChannelData(0), start = Math.round(loop.loopStartSec * sampleRate);
-  assert.ok(Math.abs(data[data.length - 1] - data[start]) < 0.05, 'no discontinuity at buffer loop seam');
+  // Sample-to-sample jumps are normal at 50Hz. The loop seam should be
+  // comparable to a natural adjacent-sample step, not forced to zero amplitude.
+  const seamStep = Math.abs(data[data.length - 1] - data[start]);
+  const normalStep = Math.abs(samples[boundaries.startSample + start - 1] -
+    samples[boundaries.startSample + start]);
+  assert.ok(Math.abs(seamStep - normalStep) < 0.01,
+    'the loop seam must preserve the original PCM sample-to-sample continuity');
 });
