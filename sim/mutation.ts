@@ -361,6 +361,13 @@ export function mutateGenome(parent: OrganismGenome, prng: PRNG, newId: string):
       if (dimChoice === 1) p.dimY = THREE.MathUtils.clamp(p.dimY + (prng.next() < 0.5 ? -1 : 1), 1, 4);
       if (dimChoice === 2) p.dimZ = THREE.MathUtils.clamp(p.dimZ + (prng.next() < 0.5 ? -1 : 1), 1, 4);
     }
+    // Small heritable innovations can silence the inherited oscillator and
+    // grant its existing neural Angle channel direct authority. No new brain
+    // outputs or scripted movement; absence keeps all older genomes unchanged.
+    if (p.parentId !== null && prng.next() < 0.08) {
+      p.motorRhythmMix = THREE.MathUtils.clamp(
+        (p.motorRhythmMix ?? 1) + prng.range(-0.35, 0.25), 0, 1);
+    }
     // Optional fin thickness is heritable and can both grow and shrink.
     // Local-Y only for now; the existing integer voxel dimensions remain
     // unchanged unless a physical plate trait evolves.
