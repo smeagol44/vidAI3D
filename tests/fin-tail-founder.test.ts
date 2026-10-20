@@ -99,7 +99,7 @@ test('both steering directions are controllable through ordinary independent bla
     'left pitch command must shift yaw to the negative side of the initial heading');
   assert.ok(x.right.yaw > .1,
     'opposing pitch command must shift yaw to the positive side');
-  assert.ok(x.right.yaw - x.left.y > .25,
+  assert.ok(x.right.yaw - x.left.yaw > .25,
     'left and right neural motor commands must cause meaningfully different headings');
   for(const r of [x.natural,x.left,x.right]){
    assert.ok(r.net>=0&&r.work>0&&r.maxGap<.005&&r.remaining>0);
