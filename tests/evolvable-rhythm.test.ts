@@ -112,3 +112,28 @@ test('asymmetric feather hinge direct mode reaches both physical angle limits wi
     assert.ok(Math.abs(o.joints[index].targetAngle-blade.minAngle)<1e-9);
   }finally{o.dispose();}
 });
+
+test('time-varying neural Angle outputs propel a direct-only body through real water', () => {
+  const g=make();
+  for(const p of g.parts)if(p.parentId!==null)p.motorRhythmMix=0;
+  const o=new OrganismInstance(g,new THREE.Vector3(0,8,0));
+  try {
+    const start=o.com.clone();
+    for(let i=0;i<600;i++){
+      // Laboratory-only neural stimulation: production provides these channels
+      // from the inherited recurrent network instead of a scripted oscillator.
+      for(let j=0;j<o.joints.length;j++){
+        o.brain.outputs[j*4]=.85*Math.sin(i*PHYSICS_DT*2*Math.PI*.7+j*.8);
+      }
+      o.updatePhysicsSubstep(PHYSICS_DT,250);
+    }
+    console.log('DIRECT_NEURAL_PHYSICAL_SWIM_029',JSON.stringify({
+      net:o.netTravelMeters,path:o.totalTravelMeters,spent:o.totalMotorChemicalSpent
+    }));
+    assert.ok(o.netTravelMeters>.005,'direct neural commands must move the physical COM');
+    assert.ok(o.totalTravelMeters>=o.netTravelMeters);
+    assert.ok(o.totalMotorChemicalSpent>0 && o.reserves>0);
+    assert.ok(o.joints.every(j=>j.anchorError<.005&&j.axisError<.01));
+    assert.ok(o.com.distanceTo(start)>0);
+  }finally{o.dispose();}
+});
