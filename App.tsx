@@ -37,6 +37,7 @@ import { SimulationClock, OUTER_DT } from './sim/clock';
 import { runLocomotionAndPhysicsVerification, VerificationReport } from './sim/verification';
 import { formatTime, gameAudio, GameState, MenuOverlay, Overlay, useAutoFocus, useIsMobile } from './utils';
 import BackgroundMusic from './utils/BackgroundMusic';
+import { VIDA_VERSION, VIDA_CREDITS } from './version';
 import { usePlayground, usePlaygroundGameLifecycle, useRpc } from './utils/usePlayground';
 
 interface CustomWindow extends Window {
@@ -167,7 +168,7 @@ export default function App() {
   const handleSpawnFounder = () => {
     if (!simRef.current) return;
     const sim = simRef.current;
-    const types: ('planar_swimmer' | '3d_serpent' | 'tri_limb')[] = ['planar_swimmer', '3d_serpent', 'tri_limb'];
+    const types: ('planar_swimmer' | '3d_serpent' | 'fin_tail')[] = ['planar_swimmer', '3d_serpent', 'fin_tail'];
     const chosen = types[Math.floor(Math.random() * types.length)];
     const genome = createFounderGenome(`founder-${Date.now()}`, `Pioneer #${sim.organisms.length + 1}`, sim.prng, chosen);
     const spawnPos = new THREE.Vector3(
@@ -216,6 +217,8 @@ export default function App() {
             <Sparkles size={18} className="text-cyan-400 animate-pulse" />
             VIDA <span className="text-xs bg-cyan-900/60 text-cyan-300 px-1.5 py-0.5 rounded border border-cyan-700">3D</span>
           </span>
+          <div className="hidden lg:block text-[10px] leading-tight text-slate-400" aria-label="Creators">{VIDA_CREDITS}</div>
+          <span className="text-[10px] font-mono text-slate-500" aria-label="VIDA 3D version">{VIDA_VERSION}</span>
           <div className="hidden sm:flex items-center gap-2 text-xs text-slate-400 font-mono">
             <span>T: {formatTime(telemetry.simulatedTimeSec)}</span>
             <span>•</span>
@@ -809,6 +812,8 @@ export default function App() {
             <h1 className="text-3xl md:text-4xl font-black text-cyan-400 mb-2 tracking-wider">
               VIDA 3D
             </h1>
+            <p className="text-xs text-slate-400 mb-1">{VIDA_CREDITS}</p>
+            <p className="text-[11px] text-slate-500 font-mono mb-4">{VIDA_VERSION}</p>
             <p className="text-slate-300 text-sm mb-6 leading-relaxed">
               A 3D voxel aquatic artificial-life sandbox. Observe articulated neural organisms sense 3D colors, swim via genuine physical hydrodynamics, feed, and evolve across generations.
             </p>
@@ -830,6 +835,8 @@ export default function App() {
             <h2 className="text-2xl font-black text-cyan-400 mb-6 uppercase tracking-wider">
               Simulation Menu
             </h2>
+            <p className="text-xs text-slate-400 -mt-4 mb-1">{VIDA_CREDITS}</p>
+            <p className="text-[11px] text-slate-500 font-mono mb-4">{VIDA_VERSION}</p>
 
             <div className="w-full space-y-3">
               <button
