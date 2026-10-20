@@ -236,10 +236,14 @@ export function createFounderGenome(id: string, name: string, prng: PRNG, type: 
   }
 
   for (let o = 0; o < 20; o++) {
-    outputBiases.push(prng.range(-0.05, 0.05));
+    // Fresh founders inherit a useful, nonzero neural controller around the
+    // calibrated oscillator gait. Angle trim and stiffness begin with gentle
+    // authority; mutations below can evolve stronger commands over generations.
+    const priorScale = o % 4 === 0 || o % 4 === 3 ? 0.15 : 1;
+    outputBiases.push(prng.range(-0.05, 0.05) * priorScale);
     const outRow: number[] = [];
     for (let h = 0; h < hiddenCount; h++) {
-      outRow.push(prng.next() < 0.35 ? prng.range(-0.4, 0.4) : 0);
+      outRow.push(prng.next() < 0.35 ? prng.range(-0.4, 0.4) * priorScale : 0);
     }
     outputWeights.push(outRow);
   }
@@ -367,6 +371,19 @@ export function mutateGenome(parent: OrganismGenome, prng: PRNG, newId: string):
         if (prng.next() < 0.15) {
           child.brain.inputWeights[h][i] = THREE.MathUtils.clamp(child.brain.inputWeights[h][i] + prng.range(-0.1, 0.1), -1.5, 1.5);
         }
+      }
+    }
+  }
+
+  // Motor outputs must evolve too: previously only input/recurrent synapses
+  // changed, so the inherited locomotor prior was effectively fixed.
+  for (let o = 0; o < child.brain.outputWeights.length; o++) {
+    if (prng.next() < 0.2) {
+      child.brain.outputBiases[o] = THREE.MathUtils.clamp((child.brain.outputBiases[o] || 0) + prng.range(-0.04, 0.04), -1, 1);
+    }
+    for (let h = 0; h < child.brain.outputWeights[o].length; h++) {
+      if (prng.next() < 0.1) {
+        child.brain.outputWeights[o][h] = THREE.MathUtils.clamp(child.brain.outputWeights[o][h] + prng.range(-0.1, 0.1), -1.5, 1.5);
       }
     }
   }
