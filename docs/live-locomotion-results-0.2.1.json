@@ -1,0 +1,73 @@
+{
+  "version": "0.2.1",
+  "scope": "Deterministic no-contact, no-feeding one-organism WorldSimulation.stepOuterTick() 20-second test; genuine sensory, recurrent, biological, motor and energy updates for live cases.",
+  "fixture": {
+    "seed": 4242,
+    "planarFounder": "PRNG(4242)",
+    "bodyLengthMeters": 2.7,
+    "organisms": 1,
+    "nutrients": 0,
+    "waterResistance": 250,
+    "outerDt": 0.016666666666666666,
+    "physicsDt": 0.008333333333333333,
+    "worldSteps": 2400
+  },
+  "before": {
+    "commit": "3272a2a6cbb543bb8fdcab4e9fc5f43f0aeb8829",
+    "measurementRun": 39393003703,
+    "neutral": {
+      "netMeters": 2.290937670968933,
+      "reserves": 202.2059054116451
+    },
+    "recurrent": {
+      "netMeters": 1.207898042375641,
+      "pathMeters": 1.4696508790523803,
+      "forwardMeters": -1.2065803309281669,
+      "reserves": 202.03631172252864
+    },
+    "onlyFrequency": {
+      "netMeters": 0.5632142447713879,
+      "pathMeters": 1.3044491661615654,
+      "forwardMeters": -0.5630968511104584,
+      "measurementRun": 39393211122
+    }
+  },
+  "after": {
+    "testRun": 39393991853,
+    "neutral": {
+      "netMeters": 2.290937670968933,
+      "pathMeters": 2.3017628423198255,
+      "reserves": 202.20590541161374
+    },
+    "recurrent": {
+      "netMeters": 2.1354900609357297,
+      "pathMeters": 2.151423077907975,
+      "forwardMeters": 2.1352595090866093,
+      "reserves": 199.90885417548512,
+      "maxPhaseErrorRadians": 0.13718910960431074,
+      "maxAnchorGapMeters": 0.000046070929998706264,
+      "realizedExcursionRadians": 2.0955412917953797,
+      "neuralMeanAbsoluteOutput": 0.06743802051397817,
+      "lastFiveForwardStrokesMeters": [
+        0.17816289265950536,
+        0.18037986755371094,
+        0.1783527533213296,
+        0.18024222056070993,
+        0.17848527431488037
+      ]
+    },
+    "frequencyOnly": {
+      "netMeters": 2.268492598829064,
+      "pathMeters": 2.282427843391124,
+      "forwardMeters": 2.2671844561894736,
+      "maxPhaseErrorRadians": 0.1401220578274103
+    }
+  },
+  "conclusion": "Independent neural frequency channels caused unbounded relative phase drift and reversal; uncalibrated randomly initialized angle/stiffness outputs further degraded inherited swimming. Phase entrainment and heritable mutable gentle founder motor priors preserve forward live-controller travel.",
+  "limitations": [
+    "One selected planar new founder only; no proof of all genomes or multi-generation survival",
+    "No 14-organism sustained-live comparison; controlled physical references and 0.2.0 measurements remain separate",
+    "No rendered game/browser validation was run",
+    "Pre-existing egg funding, food accounting, perception and identity defects remain"
+  ]
+}
