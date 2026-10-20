@@ -6,7 +6,7 @@ import {createFounderGenome} from '../sim/mutation';
 import {PRNG} from '../sim/prng';
 import {validateGenome} from '../sim/genome';
 await initializePhysics();
-type Opt={tail:number;fins:boolean;root:'tri_limb'|'planar_swimmer';strokeDuty:number;pitch:number;tailPhase:number;axis:'Y'|'Z';torque:number;reverse:boolean};
+type Opt={tail:number;fins:boolean;root:'tri_limb'|'planar_swimmer';strokeDuty:number;pitch:number;tailPhase:number;axis:'Y'|'Z';torque:number;reverse:boolean;rightPhase?:number;tipPhaseShift?:number;samePitch?:boolean};
 
 function built(o:Opt, seed=4242){
  const g=createFounderGenome('trial',o.root,new PRNG(seed),o.root);
@@ -30,7 +30,7 @@ function built(o:Opt, seed=4242){
    }
  }
  for(const [i,w] of [left,right].entries()){
-   w.hingeAxis=o.axis;w.motorMaxTorque=o.torque;w.motorPhase=i*Math.PI;
+   w.hingeAxis=o.axis;w.motorMaxTorque=o.torque;w.motorPhase=(i===0?0:(o.rightPhase??1))*Math.PI;
    w.dimX=2;w.dimY=1;w.dimZ=2;
    if(o.fins)w.motorStrokeDuty=o.strokeDuty;
  }
@@ -39,9 +39,9 @@ function built(o:Opt, seed=4242){
     ...p,id:'blade-'+i,parentId:p.id,parentFace:'+Z' as const,attachFace:'-Z' as const,
     dimX:1,dimY:1,dimZ:4,thicknessScaleY:.2,
     hingeAxis:'Z' as const,motorMaxTorque:o.torque,
-    motorPhase:i*Math.PI+Math.PI*.5,
-    restAngle:(i===0?1:-1)*o.pitch,
-    motorFeatherAngle:(i===0?-1:1)*(o.reverse?-o.pitch:o.pitch),
+    motorPhase:(i===0?.5:(o.rightPhase??1)+(o.tipPhaseShift??.5))*Math.PI,
+    restAngle:(i===0||o.samePitch?1:-1)*o.pitch,
+    motorFeatherAngle:(i===0||o.samePitch?-1:1)*(o.reverse?-o.pitch:o.pitch),
     minAngle:-Math.PI*.49,maxAngle:Math.PI*.49,
     hasMouth:false,hasEye:false
    }));
@@ -130,4 +130,21 @@ test('diagnostic: several brains and symmetric steering controls on physically f
   }
  }
  console.log('MULTISEED_STEERING_SWEEP',JSON.stringify(trials));
+});
+
+test('diagnostic: phase mirror/feather symmetry matrix for oriented net travel',()=>{
+ const base:Opt={root:'tri_limb',tail:2,fins:true,pitch:1.35,strokeDuty:.25,tailPhase:.5,axis:'Y',torque:800,reverse:false};
+ const results:ReturnType<typeof run>[]=[];
+ for(const rightPhase of [0,.5,1,1.5])
+ for(const tipPhaseShift of [0,.5,1])
+ for(const samePitch of [false,true])
+ results.push(run({...base,rightPhase,tipPhaseShift,samePitch},12,4242));
+ const ok=results.filter((x):x is Extract<typeof x,{net:number}> => 'net'in x);
+ console.log('STEERABLE_FIN_SYMMETRY_MATRIX',JSON.stringify({
+  sortedForward:[...ok].sort((a,b)=>(b.forward??0)-(a.forward??0)).slice(0,15),
+  sortedLowDrift:[...ok].filter(v=>(v.forward??0)>.2).sort((a,b)=>
+     (Math.abs(a.side??0)/(Math.abs(a.forward??0)+.001)+Math.abs(a.yaw??0))-
+     (Math.abs(b.side??0)/(Math.abs(b.forward??0)+.001)+Math.abs(b.yaw??0))).slice(0,15),
+  errors:results.filter(x=>'error'in x)
+ }));
 });
