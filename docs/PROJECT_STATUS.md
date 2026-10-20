@@ -1,5 +1,17 @@
 # VIDA 3D project status
 
+## 2026-10-20 — v0.2.2 funded lifecycle and clear-water presentation
+
+The user confirmed that creatures now travel but are **still visibly too slow**, and explicitly requested removing the distracting glitter effect in the water. Further swim-speed tuning is a separate pending benchmark; no locomotion forces, water resistance or timing parameters changed in this release. The aquarium's 180 cyan random `points` motes were removed from `Game.tsx`, retaining wall outlines, seabed and voxel anatomy.
+
+**Energy and lifecycle fixes:** Bodies have documented voxel/organ/neuron/hinge tissue construction costs, limited reserve capacity and morphology-aware starting funding. Egg construction and reserve are paid from the parent once, and hatching no longer records artificial external input. Egg orientation is preserved, and a consumed/nonviable egg becomes exactly its remaining amount of food rather than unfunded tissue. A malformed mutation cannot reuse a parent's original object/ID for a child. Internal births remain subject to exact-location physical clearance and population limits.
+
+The simulation now accumulates basal chemical heat, motor chemical expenditure, feeding trophic losses and separate physical motor work. All chemical reservoirs and explicit external input/removal counters contribute to a published conservation residual. Feeding and external feed-all interventions respect reserve capacity. On death, only real remaining tissue and reserves become edible remains. Reproduction eligibility is available as a live reason rather than an unexplained refusal.
+
+**Tests:** Added 8 targeted `tests/energy.test.ts` cases for morphology, natural death, parent-funded hatch, nonviable egg, capacity-limited external feeding, nutrient feeding, egg predation and live prey predation. Together with the 22 existing tests, the PR CI ran **30/30 passing** plus a successful TypeScript/production build (GitHub Actions run 39396820807). The regression cases verify the conserved ledger with near-zero residual. The legacy 3D reference swimming physics remained operational.
+
+See [ENERGY.md](ENERGY.md) for costs, conservation equation and documented limitations. Remaining: full shared per-mouth intake budgets and exact contact geometry; causal predation injury/scavenging, identity migration, hatch envelope validation, meaningful lifespan/juvenile progression and multi-generation ecological calibration. No browser/WebGL manual QA was attempted. **No 2D repository changes.**
+
 ## 2026-10-20 — v0.2.1 production-path neural locomotion repair
 
 **Scope and identity:** A post-v0.2.0 player report said creatures articulated but did not travel visibly in the published ecosystem. We reproduced a reduced, fresh, deterministic *live* planar founder in `WorldSimulation.stepOuterTick()`, with sensory inputs, recurrent updates, normal metabolic cost, two Rapier substeps per outer tick and actual physical work. A neutral-output control received identical ticks/biology. No feeding, walls or other organisms contacted the test swimmer. The 2D repository was strictly untouched.
