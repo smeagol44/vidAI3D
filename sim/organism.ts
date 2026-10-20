@@ -3,6 +3,7 @@ import { FaceDirection, OrganismGenome, VoxelPartGene, isBroadFace, partPhysical
 import { RigidCuboid, RevoluteJoint, PhysicsWorld, PHYSICS_DT, faceAnchor, faceNormal, axisVector } from './physics';
 import { OBB } from 'three/examples/jsm/math/OBB.js';
 import { constructionEnergy, founderReserve, reserveCapacity, CHEMICAL_UNITS_PER_MOTOR_JOULE } from './energy';
+import { strokeWave, recoveryFeatherWeight } from './gait';
 
 export class BrainInstance {
   public hiddenState: Float32Array;
@@ -195,6 +196,10 @@ export class OrganismInstance {
     const leaderPhase = leader?.jointPhase ?? 0;
     const leaderGeneticPhase = leader?.child.partGene.motorPhase ?? 0;
     const phaseCouplingPerSecond = 3;
+    // Snapshot phases before applying this substep. Child fin-pitch joints
+    // feather in response to the parent stalk's *physical motor oscillator*,
+    // never an animation-only timer or an imposed body translation.
+    const phases = new Map(this.joints.map(j => [j.child.id, j.jointPhase]));
     let outIdx=0;
     for(const joint of this.joints) {
       const g=joint.child.partGene, outputs=this.brain.outputs;
@@ -207,7 +212,13 @@ export class OrganismInstance {
       const wrappedError = Math.atan2(Math.sin(differenceError), Math.cos(differenceError));
       const correction = joint === leader ? 0 : -phaseCouplingPerSecond * wrappedError;
       joint.jointPhase=THREE.MathUtils.euclideanModulo(joint.jointPhase+(2*Math.PI*frequency+correction)*subDt,2*Math.PI);
-      const target=g.restAngle+offset+(g.maxAngle-g.minAngle)*.45*Math.sin(joint.jointPhase);
+      const parentPhase = phases.get(g.parentId ?? '');
+      const target = g.motorFeatherAngle === undefined
+        ? g.restAngle + offset + (g.maxAngle-g.minAngle) * .45 * strokeWave(joint.jointPhase, g.motorStrokeDuty ?? .5)
+        : THREE.MathUtils.clamp(
+            g.restAngle + offset + g.motorFeatherAngle * recoveryFeatherWeight(parentPhase ?? joint.jointPhase),
+            g.minAngle, g.maxAngle
+          );
       joint.applyMotorAndLimits(target,allowance,stiffness,60);
       outIdx+=4;
     }
