@@ -67,7 +67,7 @@ function run(opt:Opt,seconds=12,seed=4242,steering=0){
   const start=a.com.clone(),initial=a.reserves,old=a.brain.step.bind(a.brain);
   if(steering!==0){
    const ids=a.joints.map(j=>j.child.id);
-   const il=ids.indexOf('wing-left'),ir=ids.indexOf('wing-right');
+   const il=ids.indexOf(opt.root==='tri_limb'?'part-1':'wing-left'),ir=ids.indexOf(opt.root==='tri_limb'?'part-2':'wing-right');
    a.brain.step=(dt:number)=>{
     old(dt);
     if(il>=0&&ir>=0){
@@ -122,7 +122,7 @@ test('diagnostic: several brains and symmetric steering controls on physically f
  const hybrid:Opt={root:'tri_limb',tail:2,fins:true,pitch:1.35,strokeDuty:.25,tailPhase:.5,axis:'Y',torque:800,reverse:false};
  const planarControl:Opt={root:'planar_swimmer',tail:5,fins:false,pitch:0,strokeDuty:.5,tailPhase:.5,axis:'Y',torque:800,reverse:false};
  const opts=[baseline,tailOnly,hybrid,planarControl];
- const trials=[];
+ const trials:ReturnType<typeof run>[]=[];
  for(const seed of [4242,6001,9037]){
   for(const opt of opts){
    for(const steer of opt===hybrid ? [-.65,0,.65] : [0])
