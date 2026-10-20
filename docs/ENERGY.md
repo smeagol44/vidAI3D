@@ -1,4 +1,4 @@
-# VIDA 3D — chemical energy, tissue and funded lifecycle (v0.2.2)
+# VIDA 3D — chemical energy, tissue and funded lifecycle (current v0.2.3)
 
 This document describes the **simulation economy**, not physical conservation of SI mechanical energy. The visual UI previously labelled reserve units as J, but a motor's mechanical work (physical J) is converted to chemical reserve units by a retained **0.005 energy units per motor J** coefficient. The two quantities must not be added without that conversion. All accounting below uses *chemical energy units*.
 
@@ -22,11 +22,11 @@ New founder examples (actual generated morphologies):
 
 | Shape | Tissue construction | Initial reserve | Reserve capacity | Funded egg |
 | --- | ---: | ---: | ---: | ---: |
-| Planar, three links | 94 | 250 | 564 | 154 |
-| Nonplanar, four links | 115 | 250 | 690 | 175 |
-| Tri-limb | 179 | 358 | 1074 | 239 |
+| Planar swimmer, six links | 157 | 314 | 942 | 217 |
+| Nonplanar serpent, six links | 157 | 314 | 942 | 217 |
+| Tri-limb, three parts | 179 | 358 | 1074 | 239 |
 
-Existing/imported genome traits are not silently rewritten; reproduction checks the **actual** predicted offspring construction cost and protects a minimum parental reserve. A mutated invalid child gets a separate independent unmutated child genome/ID, not the parent's live object. Newborn reserve is **remaining egg funding minus its own tissue cost**; it is not allocated from a new external grant.
+Both six-link shapes use the same number and size of voxels but different hinge axes and inherited motor phases, so equal construction costs do not imply equal swimming performance. v0.2.2 had shorter three- and four-link mobile founders; those figures are historical, not current. Existing/imported genome traits are not silently rewritten; reproduction checks the **actual** predicted offspring construction cost and protects a minimum parental reserve. A mutated invalid child gets a separate independent unmutated child genome/ID, not the parent's live object. Newborn reserve is **remaining egg funding minus its own tissue cost**; it is not allocated from a new external grant.
 
 A mature egg with insufficient funding for tissue **and at least one reserve unit** becomes an equivalent amount of free nutrient energy, not a living creature. If hatching is physically blocked, the egg remains funded and waits at its original position and preserved orientation; the current OBB spawn test is per-part, and more sophisticated full-envelope collision avoidance remains pending.
 

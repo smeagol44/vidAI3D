@@ -195,20 +195,32 @@ export function createFounderGenome(id: string, name: string, prng: PRNG, type: 
     });
   }
 
-  // Named inherited gaits calibrated with SI cuboid inertia and normal-only water resistance.
-  // Existing/custom genomes are not rewritten; these settings define newly created founders.
-  if(type === 'planar_swimmer') {
-    for(const [i,p] of parts.entries()) { p.dimX=1; p.dimY=1; p.dimZ=3; p.motorPhase=i*Math.PI/2; }
-  }
-  if(type === '3d_serpent') {
-    parts.push({...parts[2],id:'part-3',parentId:'part-2'});
-    for(const [i,p] of parts.entries()) {
-      p.dimX=1; p.dimY=1; p.dimZ=3; p.minAngle=-Math.PI/3; p.maxAngle=Math.PI/3;
-      p.hingeAxis=i===2?'X':'Y'; p.motorPhase=[0,0,Math.PI/2,Math.PI/2][i];
+  // In still water, the inherited wave must push against anisotropic cuboid
+  // resistance: more torque or faster flapping does not improve a saturated
+  // short-link gait. Fresh mobile founders therefore use a six-link traveling
+  // wave; the 3D serpent retains its out-of-plane X hinge. Every added part is
+  // an ordinary connected, heritable and mutable genome segment, not thrust.
+  // Existing/imported genomes are never silently rewritten.
+  if (type === 'planar_swimmer' || type === '3d_serpent') {
+    if (type === '3d_serpent') parts.push({...parts[2],id:'part-3',parentId:'part-2'});
+    while(parts.length < 6) {
+      const previous=parts[parts.length-1];
+      parts.push({
+        ...previous,id:`part-${parts.length}`,parentId:previous.id,
+        parentFace:'+Z',attachFace:'-Z',
+        hasMouth:false,hasEye:false,hingeAxis:'Y'
+      });
+    }
+    for(const [i,p] of parts.entries()){
+      p.dimX=1;p.dimY=1;p.dimZ=3;p.minAngle=-Math.PI/3;p.maxAngle=Math.PI/3;
+      p.hingeAxis=type==='3d_serpent' && i===2 ? 'X':'Y';
+      p.motorPhase=i*(type==='3d_serpent' ? Math.PI/3 : Math.PI/2);
     }
   }
-  if(type === 'tri_limb') parts[2].motorPhase=parts[1].motorPhase+Math.PI/2;
-  for(const p of parts) { p.motorFrequency=.65; p.motorMaxTorque=400; }
+  if(type==='tri_limb') parts[2].motorPhase=parts[1].motorPhase+Math.PI/2;
+  // 600 N m improves the 3D serpent's authority; over 800 produced no benefit
+  // in controlled tests. The planar template retains its calibrated 400 N m.
+  for(const p of parts) { p.motorFrequency=.65; p.motorMaxTorque=type==='3d_serpent'?600:400; }
 
   const hiddenCount = 24;
   const timeConstants: number[] = [];
@@ -349,11 +361,25 @@ export function mutateGenome(parent: OrganismGenome, prng: PRNG, newId: string):
       hasEye: false,
     };
     child.parts.push(newPart);
+    // A six-link swimmer can grow a seventh part (six motors). Give the new
+    // motor four genuine neural output pathways rather than silently leaving
+    // the new hinge fixed at neutral output beyond the original 20 channels.
+    const requiredOutputs = (child.parts.length - 1) * 4;
+    while (child.brain.outputWeights.length < requiredOutputs) {
+      child.brain.outputBiases.push(prng.range(-0.01, 0.01));
+      child.brain.outputWeights.push(Array.from({length: child.brain.hiddenCount},
+        () => prng.next() < 0.2 ? prng.range(-0.06, 0.06) : 0));
+    }
   } else if (prng.next() < 0.05 && child.parts.length > 2) {
     // Remove a leaf part
     const leafIndex = child.parts.findIndex((pt, idx) => idx > 0 && !child.parts.some((other) => other.parentId === pt.id));
     if (leafIndex > 0) {
       child.parts.splice(leafIndex, 1);
+      // Joint motor channels are ordered by non-root parts. When a leaf is
+      // removed, discard its four channels so later joint outputs remain
+      // associated with their original body part.
+      child.brain.outputWeights.splice((leafIndex - 1) * 4, 4);
+      child.brain.outputBiases.splice((leafIndex - 1) * 4, 4);
     }
   }
 
