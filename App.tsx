@@ -410,6 +410,18 @@ export default function App() {
               </div>
             </div>
 
+            <div className="bg-slate-900/80 p-2.5 rounded-xl border border-slate-800 text-[11px]">
+              <span className="text-slate-300 font-bold block mb-2">Lifetime chemical energy budget</span>
+              <div className="grid grid-cols-2 gap-2 font-mono">
+                <span>Basal: {selectedOrg.totalBasalChemicalSpent.toFixed(1)}</span>
+                <span>Motors: {selectedOrg.totalMotorChemicalSpent.toFixed(1)}</span>
+                <span>Food gained: {selectedOrg.totalFoodEaten.toFixed(1)}</span>
+                <span>Predation lost: {selectedOrg.totalPredationChemicalLost.toFixed(1)}</span>
+                <span>Eggs funded: {selectedOrg.totalEggFundingSpent.toFixed(1)}</span>
+                <span>Life remaining: {Math.max(0, selectedOrg.genome.metabolism.lifespanSec - selectedOrg.ageSec).toFixed(1)} s</span>
+              </div>
+            </div>
+
             {/* Joints and Anchor Error Readout */}
             <div className="bg-slate-900/80 p-2.5 rounded-xl border border-slate-800">
               <span className="text-slate-400 font-bold block mb-1">
@@ -725,6 +737,13 @@ export default function App() {
               <div className="flex justify-between py-1">
                 <span className="text-slate-400">Physical motor work:</span>
                 <span className="text-slate-200">{Math.round(telemetry.chemicalEnergyLedger.mechanicalWorkJoules)} J</span>
+              </div>
+              <div className="pt-2 border-t border-slate-700 text-[11px] text-slate-300">
+                <div>Deaths: {telemetry.totalDeaths} · starvation {telemetry.deathsByCause.starvation} · predation {telemetry.deathsByCause.predation} · age {telemetry.deathsByCause.old_age}</div>
+                {telemetry.mostRecentDeath && <div className="mt-1 text-amber-300">
+                  Last: {telemetry.mostRecentDeath.id} · {telemetry.mostRecentDeath.cause} · {telemetry.mostRecentDeath.ageSec.toFixed(1)} simulated s
+                </div>}
+                <div className="text-slate-500 mt-1">Time and death ages use simulated seconds; 5× can advance 50 simulated seconds in 10 real seconds when achieved.</div>
               </div>
               <div className="flex justify-between py-1 border-t border-slate-700">
                 <span className="text-slate-200 font-bold">Conservation residual:</span>

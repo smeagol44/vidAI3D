@@ -24,6 +24,20 @@ export interface Egg {
   rotation?: [number, number, number, number];
 }
 
+export type DeathCause = 'starvation' | 'predation' | 'old_age';
+
+export interface DeathRecord {
+  id: string;
+  generation: number;
+  ageSec: number;
+  cause: DeathCause;
+  lifetimeBasalSpent: number;
+  lifetimeMotorSpent: number;
+  lifetimeEggFunding: number;
+  lifetimePredationLost: number;
+  lifetimeFoodGained: number;
+}
+
 export interface EcosystemTelemetry {
   simulatedTimeSec: number;
   fps: number;
@@ -35,6 +49,8 @@ export interface EcosystemTelemetry {
   highestGeneration: number;
   totalBirths: number;
   totalDeaths: number;
+  deathsByCause: Record<DeathCause, number>;
+  mostRecentDeath: DeathRecord | null;
   totalFoodConsumed: number;
   averageAnchorError: number;
   chemicalEnergyLedger: {
@@ -62,6 +78,9 @@ export class WorldSimulation {
   public maxOrganisms: number = 45;
   public totalBirths: number = 0;
   public totalDeaths: number = 0;
+  public deathsByCause: Record<DeathCause, number> = {starvation: 0, predation: 0, old_age: 0};
+  public recentDeaths: DeathRecord[] = [];
+  private predationDepletedThisTick = new Set<OrganismInstance>();
   public totalFoodConsumed: number = 0;
   public highestGenerationReached: number = 1;
   public externalEnergyAdded: number = 0;
@@ -88,6 +107,9 @@ export class WorldSimulation {
     this.simTime = 0;
     this.totalBirths = 0;
     this.totalDeaths = 0;
+    this.deathsByCause = {starvation: 0, predation: 0, old_age: 0};
+    this.recentDeaths = [];
+    this.predationDepletedThisTick.clear();
     this.totalFoodConsumed = 0;
     this.highestGenerationReached = 1;
     this.externalEnergyAdded = 0;
@@ -189,6 +211,7 @@ export class WorldSimulation {
   public stepOuterTick(outerDt: number = 1 / 60) {
     if(Math.abs(outerDt-1/60)>1e-12) throw new Error('Outer ticks must stay fixed at 1/60 s.');
     this.simTime += outerDt;
+    this.predationDepletedThisTick.clear();
 
     // 1. Replenish nutrients if below target
     if (this.nutrientInflowPerSec > 0 && this.nutrients.length < this.targetNutrientCount) {
@@ -242,6 +265,7 @@ export class WorldSimulation {
       org.ageSec += outerDt;
       const upkeep = Math.min(Math.max(0, org.reserves), basalUpkeepPerSecond(org.genome) * outerDt);
       org.reserves -= upkeep;
+      org.totalBasalChemicalSpent += upkeep;
       this.chemicalHeat += upkeep;
       this.populateSensoryInputs(org);
       org.brain.step(outerDt);
@@ -287,6 +311,7 @@ export class WorldSimulation {
         const funding = Math.max(org.genome.metabolism.eggEnergyFunding, Math.ceil(viableEggFunding(childGenome)));
         if (org.reserves - funding >= Math.max(50, org.structuralEnergy * .25)) {
           org.reserves -= funding;
+          org.totalEggFundingSpent += funding;
           org.lastReproduceSec = org.ageSec;
           this.eggs.push({
             id: `egg-${this.nextIdCounter++}`,
@@ -301,26 +326,44 @@ export class WorldSimulation {
         }
       }
 
-      // Death check
-      if (org.reserves <= 0 || org.ageSec >= org.genome.metabolism.lifespanSec) {
-        org.isDead = true;
-        this.totalDeaths++;
-        const remains = org.structuralEnergy + Math.max(0, org.reserves);
-        if (remains > 0) {
-          const spawnCount = Math.min(6, Math.max(1, Math.ceil(remains / 40)));
-          for (let k = 0; k < spawnCount; k++) {
-            this.nutrients.push({
-              id: `nut-${this.nextIdCounter++}`,
-              pos: org.com.clone().add(new THREE.Vector3(
-                this.prng.range(-0.5, 0.5), this.prng.range(-0.5, 0.5), this.prng.range(-0.5, 0.5)
-              )),
-              energy: remains / spawnCount,
-            });
-          }
+    }
+
+    // Resolve deaths after all mouths have interacted. Previously a predator
+    // visiting later in iteration could deplete an already-processed prey,
+    // leaving it 'alive' for one extra tick and misreporting the cause.
+    for (let oIdx = this.organisms.length - 1; oIdx >= 0; oIdx--) {
+      const org = this.organisms[oIdx];
+      if (org.reserves > 0 && org.ageSec < org.genome.metabolism.lifespanSec) continue;
+      const cause: DeathCause = org.reserves <= 0
+        ? (this.predationDepletedThisTick.has(org) ? 'predation' : 'starvation')
+        : 'old_age';
+      org.isDead = true;
+      this.totalDeaths++;
+      this.deathsByCause[cause]++;
+      this.recentDeaths.unshift({
+        id: org.genome.id, generation: org.genome.generation, ageSec: org.ageSec, cause,
+        lifetimeBasalSpent: org.totalBasalChemicalSpent,
+        lifetimeMotorSpent: org.totalMotorChemicalSpent,
+        lifetimeEggFunding: org.totalEggFundingSpent,
+        lifetimePredationLost: org.totalPredationChemicalLost,
+        lifetimeFoodGained: org.totalFoodEaten,
+      });
+      if (this.recentDeaths.length > 12) this.recentDeaths.pop();
+      const remains = org.structuralEnergy + Math.max(0, org.reserves);
+      if (remains > 0) {
+        const spawnCount = Math.min(6, Math.max(1, Math.ceil(remains / 40)));
+        for (let k = 0; k < spawnCount; k++) {
+          this.nutrients.push({
+            id: `nut-${this.nextIdCounter++}`,
+            pos: org.com.clone().add(new THREE.Vector3(
+              this.prng.range(-0.5, 0.5), this.prng.range(-0.5, 0.5), this.prng.range(-0.5, 0.5)
+            )),
+            energy: remains / spawnCount,
+          });
         }
-        org.dispose();
-        this.organisms.splice(oIdx, 1);
       }
+      org.dispose();
+      this.organisms.splice(oIdx, 1);
     }
   }
 
@@ -555,6 +598,8 @@ export class WorldSimulation {
             const intake = Math.min(prey.reserves, maxIntake, Math.max(0, org.reserveCapacity - org.reserves) / TROPHIC_EFFICIENCY);
             if (intake > 0) {
               prey.reserves -= intake; // Subtract from prey FIRST
+              prey.totalPredationChemicalLost += intake;
+              if (prey.reserves <= 0) this.predationDepletedThisTick.add(prey);
               const gained = intake * TROPHIC_EFFICIENCY;
               this.chemicalHeat += intake - gained;
               org.reserves += gained; // Credit predator after losses
@@ -609,6 +654,8 @@ export class WorldSimulation {
       highestGeneration: this.highestGenerationReached,
       totalBirths: this.totalBirths,
       totalDeaths: this.totalDeaths,
+      deathsByCause: {...this.deathsByCause},
+      mostRecentDeath: this.recentDeaths[0] ?? null,
       totalFoodConsumed: this.totalFoodConsumed,
       averageAnchorError: jointCount > 0 ? totalAnchorError / jointCount : 0,
       chemicalEnergyLedger: {

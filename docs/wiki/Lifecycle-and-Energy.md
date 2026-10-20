@@ -1,0 +1,13 @@
+# Lifecycle and energy
+
+Organisms consist of real Rapier-connected rigid bodies with genetically encoded recurrent motor control. Each living individual has **structural construction energy**, a finite usable chemical reserve and a storage capacity. True motor work (physical joules) costs chemical reserve through a fixed conversion of **0.005 chemical units per physical joule**; basal metabolism also burns reserve. These losses become chemical heat in the conserved world ledger.
+
+**New externally inserted founders:** initial reserve is four times construction energy, bounded by capacity and a minimum 250-unit allowance. External insertion credits precisely the initial tissue and reserve to the world input ledger; there is no hidden refilling once born.
+
+**Parent-funded reproduction:** when age/cooldown, reserve threshold and post-payment reserve permit it, the parent pays for an egg containing construction energy plus at least one construction-energy budget for the offspring's usable reserve. On hatching, tissue is constructed from that stored funding; the rest becomes the newborn's reserve. The newborn receives **no separate founding grant**. Insufficiently funded eggs convert to edible material; blocked eggs wait for physical clearance.
+
+**Death:** organisms perish when their energy reserves are exhausted or their inherited lifespan is reached. Death is resolved after all mouths interact in the tick, so a depleted prey cannot remain live until the next tick. Three recorded causes are `starvation` (reserve exhaustion not caused by the final bite), `predation` (reserve depletion by physical oral contact that tick), and `old_age` (lifespan reached with remaining reserve). In simultaneous cases, reserve depletion takes precedence. Tissue plus surviving reserves become conserved remains.
+
+**Observation:** select an organism to inspect lifetime basal, motor and predation losses, egg funding, food gained, and remaining lifespan. Open the Energy Ledger to inspect global death counts, last death cause/age and energy-conservation residual. All age measurements are in **simulated seconds**; a fast-forward setting can make several simulated seconds elapse per wall second, subject to achieved performance.
+
+**Known limits:** The increased finite initial reserve and egg investments do not prove reliable independent foraging, hunting or sustained multi-generation populations. In a 45-s 14-founder pre-calibration trial, motor expenditure dominated, five creatures died and natural feeding was scarce. There are no artificial survival scripts or free-energy boosts.

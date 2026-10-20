@@ -1,58 +1,26 @@
-# VIDA 3D — chemical energy, tissue and funded lifecycle (current v0.2.3)
+# VIDA 3D — chemical energy, mortality and funded lifecycle
 
-This document describes the **simulation economy**, not physical conservation of SI mechanical energy. The visual UI previously labelled reserve units as J, but a motor's mechanical work (physical J) is converted to chemical reserve units by a retained **0.005 energy units per motor J** coefficient. The two quantities must not be added without that conversion. All accounting below uses *chemical energy units*.
+The simulation uses chemical reserve units, **not SI joules**. Real motor work in physical joules is converted by `0.005 chemical units / motor joule`; it must never be added to stored chemical energy before conversion. The ledger checks external input minus external removal against living reserves, tissue, egg funding, nutrients and accumulated chemical heat.
 
-## Biological costs and capacity
+## Current biological budgets
 
-These are initial game-economy rules, to be tuned after reliable feeding and multi-generation experiments, not measured biological tissue densities.
+- Body construction: **5 per voxel** (including inherited thin-plate thickness), **15 per mouth**, **10 per eye**, **6 per hinge** and **0.5 per recurrent neuron**.
+- Basal upkeep: inherited `baseUpkeepPerSec` plus **0.001 × construction energy each simulated second**.
+- Capacity: **max(500, ceil(6 × construction energy))**.
+- Initial **externally seeded** founder reserve: **min(capacity, max(250, ceil(4 × construction energy)))**, all recorded as external input. Existing saved DNA is not rewritten.
+- Required egg funding: **construction energy + max(60, construction energy)**, ensuring every valid hatch has a reserve of at least a construction-energy budget. Parent funding is deducted once, with a minimum remaining-parent reserve protected by the existing eligibility checks. No energy enters at hatching.
+- Prior default founder reserves were 314 for six-link planar/serpent and 482 for fin-tail; new defaults are 628 and 964 respectively. This is a larger explicitly-funded initial allocation, not hidden energy regeneration.
 
-| Cost | Energy units |
-| --- | ---: |
-| Cuboid tissue | 5 per 0.3 m voxel |
-| Mouth | 15 |
-| Eye | 10 |
-| Hinged attachment | 6 |
-| Recurrent neuron | 0.5 |
-| Basal upkeep | genome base upkeep + 0.001 × construction energy / second |
-| Reserve capacity | max(500, ceil(6 × construction energy)) |
-| Externally seeded reserve | min(capacity, max(250, ceil(2 × construction energy))) |
-| Founder's egg funding | max(140, ceil(construction energy + 60)) |
+The evolved brain, physical motors and inherited traits are unchanged. Newborns do not receive the founder reserve grant; they receive precisely egg funding minus the cost to construct their tissues. If egg funding is insufficient, it becomes conserved edible material. If physical clearance fails, incubation completes but hatching remains blocked at the egg's actual location.
 
-New founder examples (actual generated morphologies):
+## Death and diagnostics
 
-| Shape | Tissue construction | Initial reserve | Reserve capacity | Funded egg |
-| --- | ---: | ---: | ---: | ---: |
-| Planar swimmer, six links | 157 | 314 | 942 | 217 |
-| Nonplanar serpent, six links | 157 | 314 | 942 | 217 |
-| Tri-limb, three parts | 179 | 358 | 1074 | 239 |
+Each production physics tick first charges basal upkeep, physical motor work and oral interactions. **All deaths are then resolved in a final pass**. A prey depleted by a predator's actual mouth contact dies on the same tick irrespective of organism iteration order. If a depleted organism was not killed by a bite this tick, its recorded cause is starvation/reserve exhaustion. A creature reaching its inherited lifespan with positive reserves is old-age death. When aging and exhaustion coincide, depletion takes precedence. A death converts its remaining chemical reserve plus original tissue energy into funded nutrient remains with no invented energy.
 
-Both six-link shapes use the same number and size of voxels but different hinge axes and inherited motor phases, so equal construction costs do not imply equal swimming performance. v0.2.2 had shorter three- and four-link mobile founders; those figures are historical, not current. Existing/imported genome traits are not silently rewritten; reproduction checks the **actual** predicted offspring construction cost and protects a minimum parental reserve. A mutated invalid child gets a separate independent unmutated child genome/ID, not the parent's live object. Newborn reserve is **remaining egg funding minus its own tissue cost**; it is not allocated from a new external grant.
+The organism inspector shows separate *lifetime* motor and basal chemical spending, egg funding, victim reserve consumed by bites, actual oral gain and remaining lifespan. The energy ledger includes cumulative death counts and the most recent death's simulated age/cause. Recent death entries are bounded for display and are not biological inputs; resetting the world clears them. No saved genome field or neural signal was added.
 
-A mature egg with insufficient funding for tissue **and at least one reserve unit** becomes an equivalent amount of free nutrient energy, not a living creature. If hatching is physically blocked, the egg remains funded and waits at its original position and preserved orientation; the current OBB spawn test is per-part, and more sophisticated full-envelope collision avoidance remains pending.
+## Evidence and limitations
 
-## Conserved transfers
+In the v0.2.7 14-founder, 400-nutrient, 45-s production audit (seed 4242), 5 founders died and no eggs were laid. Several six-link founders spent 230–254 units on motors within 30 seconds, while basal upkeep was 0.557/s. Only ~305 units total were eaten in 45 seconds by all 14 combined. This justifies a **finite initial viability window** and physically funded hatchling reserves rather than changing the water model or inventing food. Follow-up tests should distinguish the effects of better funding from actual feeding and multi-generation self-sufficiency; no sustainable ecology claim is made.
 
-- External founder insertion, nutrient seeding and explicit feed-all intervention increment cumulative external input by **exactly what enters**. A full reserve cannot gain more from feed-all.
-- Explicit removal of free nutrients increments cumulative external removal; internal decomposition or hatching must **never** increment either external counter.
-- Herbivore food transfers actual consumed free-nutrient energy into available reserve capacity, leaving unabsorbed food in place.
-- Carnivore/omnivore egg and prey intake deducts the actual gross amount from the victim, credits 80% to predator reserve, and records the remaining 20% as chemical heat. Source depletion is capacity limited. **Shared per-mouth intake across food types is still outstanding.**
-- Basal energy burn and active motor chemical cost are charged into cumulative heat, even after individual organisms die. Active motor physical work is accumulated separately in SI joules. No chemical cost is charged for passive joint reaction forces.
-- Death converts **only existing tissue plus remaining nonnegative reserve** into evenly funded nutrient remains. It does not create 35 units per nutrient regardless of original energy.
-- No automatic replacement creatures, synthetic propulsion or hidden reserve top-ups were added.
-
-The world-wide conservation check is
-
-```
-residual = externalInput - externalRemovals
-  - (livingReserves + livingTissue + fundedEggs + freeNutrients + cumulativeChemicalHeat)
-```
-
-This is computed from unrounded values and shown in the Chemical Energy Ledger. Near-zero residual is expected during normal production operations. Arbitrary direct mutation of `org.reserves`, `sim.nutrients`, or `egg.fundingRemaining` outside these APIs can make the residual nonzero; test-only damage scenarios explicitly balance destroyed energy into heat. The `totalFoodConsumed` counter retains its earlier meaning of assimilated units, not all gross intake.
-
-## Validation and limitations
-
-Dedicated `tests/energy.test.ts` runs real production ecosystem ticks to check morphology costs, capacity, intervention removal, natural death decomposition, funded reproduction/hatching, consumed nonviable eggs and all three feeding pathways. The previous swimming, hinge and timing suite stays in CI. The selected tests verify closed-world conservation residuals within `1e-5` chemical units; untested extended ecosystems are **not** certified.
-
-Remaining work includes shared mouth budgets and correct contact geometry, a complete carcass/tissue injury system, detailed death causes, sophisticated non-interlocking hatch envelope clearance, lifespan and juvenile growth, broader identity/validation repairs and multi-generation survival calibration. Swimming speed is separately pending: approximately 0.1 m/s for the controlled planar founder means a 26-m tank is large relative to travel per stroke. Optimize with measured locomotion and ecological objectives rather than ungrounded forces.
-
-Visual presentation: the 180 random cyan point motes previously rendered inside the aquarium were removed at user request; box walls, seabed, creature mesh and hydrodynamics remain untouched. No browser/WebGL manual validation was performed.
+The retained `tests/energy.test.ts` and new mortality tests check energy conservation and causal death recording. No browser QA was performed.

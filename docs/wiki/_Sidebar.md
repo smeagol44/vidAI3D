@@ -2,3 +2,4 @@
 - [[Home]]
 - [[Interface-and-Controls]]
 - [[Audio-and-Music]]
+- [[Lifecycle-and-Energy]]

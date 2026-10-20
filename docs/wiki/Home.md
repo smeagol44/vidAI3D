@@ -8,5 +8,6 @@ This Wiki describes the **currently implemented features**, not a development hi
 
 - [[Interface-and-Controls]]
 - [[Audio-and-Music]]
+- [[Lifecycle-and-Energy]]
 
 **Limitations:** Useful locomotion, successful independent foraging and long-term ecosystem survival are still under investigation.
