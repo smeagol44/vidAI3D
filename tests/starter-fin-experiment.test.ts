@@ -58,7 +58,7 @@ function built(o:Opt, seed=4242){
  if(!validateGenome(g))throw Error('genome invalid');
  return g;
 }
-function run(opt:Opt,seconds=12,seed=4242,steering=0){
+function run(opt:Opt,seconds=12,seed=4242,steering=0,steeringMode:'stalk'|'blade'='stalk'){
  const s=new WorldSimulation(seed,0);
  try{
   s.clearFreeNutrients();s.targetNutrientCount=0;s.nutrientInflowPerSec=0;
@@ -67,7 +67,7 @@ function run(opt:Opt,seconds=12,seed=4242,steering=0){
   const start=a.com.clone(),initial=a.reserves,old=a.brain.step.bind(a.brain);
   if(steering!==0){
    const ids=a.joints.map(j=>j.child.id);
-   const il=ids.indexOf(opt.root==='tri_limb'?'part-1':'wing-left'),ir=ids.indexOf(opt.root==='tri_limb'?'part-2':'wing-right');
+   const il=ids.indexOf(steeringMode==='blade'?'blade-0':opt.root==='tri_limb'?'part-1':'wing-left'),ir=ids.indexOf(steeringMode==='blade'?'blade-1':opt.root==='tri_limb'?'part-2':'wing-right');
    a.brain.step=(dt:number)=>{
     old(dt);
     if(il>=0&&ir>=0){
@@ -89,11 +89,11 @@ function run(opt:Opt,seconds=12,seed=4242,steering=0){
   const yaw=Math.atan2(heading.x, -heading.z)-Math.atan2(startOrientation.x,-startOrientation.z);
   const wrappedYaw=Math.atan2(Math.sin(yaw),Math.cos(yaw));
   const displacement=a.com.clone().sub(start);
-  return{opt,seed,steering,steps,parts:a.bodies.length,net:displacement.length(),
+  return{opt,seed,steering,steeringMode,steps,parts:a.bodies.length,net:displacement.length(),
    forward:-displacement.z,side:displacement.x,y:displacement.y,half,path,yaw:wrappedYaw,
    reserve:a.reserves,spent:initial-a.reserves,eff:(initial-a.reserves)>0?displacement.length()/(initial-a.reserves):0,
    work:a.totalWorkJoules,gap,axis,ledger:s.getTelemetry().chemicalEnergyLedger.conservationResidual,alive:s.organisms.includes(a)};
- }catch(e){return{opt,seed,steering,error:String(e)};}finally{s.dispose();}
+ }catch(e){return{opt,seed,steering,steeringMode,error:String(e)};}finally{s.dispose();}
 }
 test('explore hybrid fin and axial starter designs through real ecosystem ticks',()=>{
  const options:Opt[]=[];
@@ -147,4 +147,13 @@ test('diagnostic: phase mirror/feather symmetry matrix for oriented net travel',
      (Math.abs(b.side??0)/(Math.abs(b.forward??0)+.001)+Math.abs(b.yaw??0))).slice(0,15),
   errors:results.filter(x=>'error'in x)
  }));
+});
+
+test('diagnostic: existing neural fin pitch outputs control heading without external thrust',()=>{
+ const hybrid:Opt={root:'tri_limb',tail:2,fins:true,pitch:1.35,strokeDuty:.25,tailPhase:.5,axis:'Y',torque:800,reverse:false};
+ const results:ReturnType<typeof run>[]=[];
+ for(const seed of [4242,6001,9037])
+ for(const mode of ['blade','stalk'] as const)
+ for(const steer of [-1,-.5,0,.5,1])results.push(run(hybrid,15,seed,steer,mode));
+ console.log('PITCH_STEERING_RESPONSE',JSON.stringify(results));
 });
