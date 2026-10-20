@@ -133,3 +133,34 @@ test('living full-ecosystem feather orientation / duty: true physical signed tra
  assert.ok(records.every(r=>Number.isFinite(r.net)&&r.path>=r.net&&r.energy>0&&r.maxGap<.005
   &&Math.abs(r.residual)<1e-5&&r.remain>0));
 });
+
+test('same-size old and feathered blades over twenty simulated seconds',()=>{
+ const run=(feathered:boolean)=>{
+  const s=new WorldSimulation(4242,0);
+  try{
+   s.clearFreeNutrients();s.targetNutrientCount=0;s.nutrientInflowPerSec=0;
+   const g=fins(.5,0,4,!feathered);
+   if(feathered){
+    g.parts[2].restAngle=1.35;g.parts[4].restAngle=-1.35;
+    g.parts[2].motorFeatherAngle=-1.35;g.parts[4].motorFeatherAngle=1.35;
+   }
+   const o=s.addOrganism(g,new THREE.Vector3(0,8,0));
+   const start=o.com.clone(),previous=start.clone(),startEnergy=o.reserves;
+   let path=0,maxGap=0;
+   for(let t=0;t<1200;t++){
+    s.stepOuterTick();
+    path+=o.com.distanceTo(previous);previous.copy(o.com);
+    for(const j of o.joints)maxGap=Math.max(maxGap,j.anchorError);
+   }
+   return{feathered,net:o.com.distanceTo(start),delta:o.com.clone().sub(start).toArray(),
+    path,remaining:o.reserves,spent:startEnergy-o.reserves,maxGap,work:o.totalWorkJoules,
+    residual:s.getTelemetry().chemicalEnergyLedger.conservationResidual};
+  }finally{s.dispose();}
+ };
+ const baseline=run(false),feathered=run(true);
+ console.log('LONG_POWER_RECOVERY_COMPARISON',JSON.stringify({baseline,feathered}));
+ for(const x of [baseline,feathered]) {
+  assert.ok(Number.isFinite(x.net)&&x.path>=x.net&&x.spent>0&&x.remaining>0
+    &&x.maxGap<.005&&Math.abs(x.residual)<1e-5);
+ }
+});
