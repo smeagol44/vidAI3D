@@ -57,6 +57,9 @@ test('a 0.2-scale physical fin uses 0.06m collision, drag, volume and anchor dim
   }finally{world.dispose();}
   const ap=getMouthApertureLocal('+Y',fin.dimX,fin.dimY,fin.dimZ,fin.thicknessScaleY);
   assert.ok(Math.abs(ap.localPos.y-(.03+.02))<1e-9);
+  const zPlate=getMouthApertureLocal('+Z',fin.dimX,fin.dimY,fin.dimZ,fin.thicknessScaleY);
+  const normalZPlate=getMouthApertureLocal('+Z',fin.dimX,fin.dimY,fin.dimZ,1);
+  assert.ok(zPlate.plateHeight < normalZPlate.plateHeight);
 });
 
 test('invalid, nonfinite and undersized fins are rejected before Rapier construction',()=>{
