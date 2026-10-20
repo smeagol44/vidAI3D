@@ -5,6 +5,7 @@ import { OBB } from 'three/examples/jsm/math/OBB.js';
 import { PRNG } from './prng';
 import { createFounderGenome, mutateGenome } from './mutation';
 import { OrganismGenome, getMouthApertureLocal, isContactingMouthAperture } from './genome';
+import { basalUpkeepPerSecond, constructionEnergy, viableEggFunding } from './energy';
 
 export interface Nutrient {
   id: string;
@@ -20,6 +21,7 @@ export interface Egg {
   fundingRemaining: number;
   initialFunding: number;
   incubationRemainingSec: number;
+  rotation?: [number, number, number, number];
 }
 
 export interface EcosystemTelemetry {
@@ -41,7 +43,10 @@ export interface EcosystemTelemetry {
     organismTissue: number;
     eggEnergy: number;
     nutrientEnergy: number;
-    dissipatedMetabolicWork: number;
+    dissipatedMetabolicWork: number; // retained UI field: chemical heat, not mechanical joules
+    mechanicalWorkJoules: number;
+    externalRemovals: number;
+    conservationResidual: number;
   };
 }
 
@@ -60,6 +65,9 @@ export class WorldSimulation {
   public totalFoodConsumed: number = 0;
   public highestGenerationReached: number = 1;
   public externalEnergyAdded: number = 0;
+  public externalEnergyRemoved: number = 0;
+  public chemicalHeat: number = 0;
+  public cumulativeMechanicalWorkJoules: number = 0;
   public nextIdCounter: number = 100;
   public waterDragCoeff: number = DEFAULT_WATER_RESISTANCE;
   public physics!: PhysicsWorld;
@@ -83,6 +91,10 @@ export class WorldSimulation {
     this.totalFoodConsumed = 0;
     this.highestGenerationReached = 1;
     this.externalEnergyAdded = 0;
+    this.externalEnergyRemoved = 0;
+    this.chemicalHeat = 0;
+    this.cumulativeMechanicalWorkJoules = 0;
+    this.nextIdCounter = 100;
     this.nutrientAccumulator = 0;
     this.physicsStepCount = 0;
 
@@ -112,10 +124,41 @@ export class WorldSimulation {
       for(const sign of [-1,1]) offsets.push(axis.clone().multiplyScalar(radius*sign));
     const place=offsets.map(v=>v.add(pos)).find(p=>this.canSpawn(genome,p,rot));
     if(!place) throw new Error('No clear space for this organism.');
-    const org = new OrganismInstance(genome, place, rot, this.physics);
-    this.organisms.push(org);
+    const org = this.constructOrganism(genome, place, rot);
     this.externalEnergyAdded += org.reserves + org.structuralEnergy;
     return org;
+  }
+
+  /** Internal construction does not count parent-funded births as external input. */
+  private constructOrganism(genome: OrganismGenome, pos: THREE.Vector3, rot: THREE.Quaternion) {
+    if (this.organisms.length >= this.maxOrganisms) throw new Error('Organism population limit reached.');
+    const org = new OrganismInstance(genome, pos, rot, this.physics);
+    this.organisms.push(org);
+    return org;
+  }
+
+  /** Explicit user intervention; credits exactly the energy actually delivered. */
+  public feedAllOrganisms(amount: number): number {
+    if (!Number.isFinite(amount) || amount < 0) throw new Error('Invalid external feeding amount.');
+    let added = 0;
+    for (const org of this.organisms) {
+      if (org.isDead) continue;
+      const gain = Math.min(amount, Math.max(0, org.reserveCapacity - org.reserves));
+      org.reserves += gain;
+      added += gain;
+    }
+    this.externalEnergyAdded += added;
+    return added;
+  }
+
+  public reproductionBlockReason(org: OrganismInstance): string | null {
+    if (org.isDead || org.reserves <= 0) return 'Not alive';
+    if (this.organisms.length + this.eggs.length >= this.maxOrganisms) return 'Population limit';
+    if (org.ageSec - org.lastReproduceSec <= org.genome.metabolism.reproduceCooldownSec) return 'Reproduction cooldown';
+    if (org.reserves <= org.genome.metabolism.reproduceReserveThreshold) return 'Below reproduction threshold';
+    const funding = Math.max(org.genome.metabolism.eggEnergyFunding, viableEggFunding(org.genome));
+    if (org.reserves - funding < Math.max(50, org.structuralEnergy * .25)) return 'Insufficient reserve after egg funding';
+    return null;
   }
 
   public seedNutrients(count: number) {
