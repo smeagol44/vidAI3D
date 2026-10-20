@@ -24,12 +24,12 @@ export function reserveCapacity(genome: OrganismGenome): number {
 }
 
 export function founderReserve(genome: OrganismGenome): number {
-  return Math.min(reserveCapacity(genome), Math.max(250, Math.ceil(constructionEnergy(genome) * 2)));
+  return Math.min(reserveCapacity(genome), Math.max(250, Math.ceil(constructionEnergy(genome) * 4)));
 }
 
 /** Newborn must receive funded tissue plus a positive usable reserve. */
 export function viableEggFunding(genome: OrganismGenome): number {
-  return constructionEnergy(genome) + 60;
+  return constructionEnergy(genome) + Math.max(60, constructionEnergy(genome));
 }
 
 /** Basal upkeep is a chemical loss, including a small anatomy-dependent load. */

@@ -1,0 +1,44 @@
+import assert from 'node:assert/strict';
+import { test } from 'node:test';
+import { WorldSimulation } from '../sim/simulation';
+import { initializePhysics } from '../sim/physics';
+import { basalUpkeepPerSecond } from '../sim/energy';
+
+await initializePhysics();
+
+test('bounded production-world mortality baseline: live reserves and cause proxies', () => {
+  const sim = new WorldSimulation(4242, 14);
+  const founding = new Map(sim.organisms.map(o=>[o.genome.id, {
+    parts:o.bodies.length, start:o.reserves, basal:basalUpkeepPerSecond(o.genome),
+    lifespan:o.genome.metabolism.lifespanSec,
+    eggFunding:o.genome.metabolism.eggEnergyFunding,
+  }]));
+  const read = (at:number) => ({
+    at, alive:sim.organisms.length, deaths:sim.totalDeaths, eggs:sim.eggs.length,
+    fed:sim.totalFoodConsumed, births:sim.totalBirths, deathCauses:{...sim.deathsByCause},
+    groups: Array.from(founding.entries()).map(([id,g])=>{
+      const o=sim.organisms.find(o=>o.genome.id===id);
+      return {id,parts:g.parts,initial:g.start,basePerSec:g.basal,life:g.lifespan,
+        r:o?.reserves ?? null,age:o?.ageSec ?? null,
+        motor:o?.totalMotorChemicalSpent ?? null,
+        food:o?.totalFoodEaten ?? null};
+    }),
+    residual:sim.getTelemetry().chemicalEnergyLedger.conservationResidual,
+  });
+  try {
+    const records=[read(0)];
+    for(let i=1;i<=45*60;i++) {
+      sim.stepOuterTick();
+      if (i%600===0 || i===45*60) records.push(read(i/60));
+    }
+    console.log('MORTALITY_CHECK_028',JSON.stringify(records));
+    assert.ok(records.every(r=>Math.abs(r.residual)<1e-5));
+    assert.ok(records.filter(r=>r.at<=20).every(r=>r.alive===14), 'founders survive the first twenty simulated seconds');
+    const end=records.find(r=>r.at===45)!;
+    assert.ok(end.deaths < 5, 'fewer deaths than the v0.2.7 same-world 45s baseline of five');
+    assert.ok(end.alive >= 14, 'real hatchings must replace any early mortality without scripted founders');
+    assert.ok(end.births > 0 && end.eggs > 0, 'parent-funded egg laying and hatching are observed');
+    assert.ok(records[0].groups.filter(g=>g.parts===6).every(g=>g.initial===628));
+    assert.ok(records[0].groups.filter(g=>g.parts===7).every(g=>g.initial===964));
+  }finally {sim.dispose();}
+});

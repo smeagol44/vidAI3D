@@ -1,5 +1,17 @@
 # VIDA 3D project status
 
+## 2026-10-20 — v0.2.8 Phase A: measured mortality and finite, funded survival calibration
+
+A deterministic 45 simulated-second default 14-founder world on v0.2.7 had **14 alive at 10 s**, **11 at 40 s**, and **9 at 45 s**, with **0 eggs laid**. Planar/serpent founders began with 314 reserve and fin-tails 482. Basal costs were 0.557/0.641 chemical units per second, but six-link motor costs reached ~230–254 units by 30 s for several founders. Total real-mouth food intake across the world was ~305 units in 45 s, insufficient to support all organisms; age expiry was 160 s and not a plausible cause of early death. Five-fold simulation speed would compress 45 simulated seconds into roughly nine wall seconds **only when achieved throughput permits**. Energy ledger residual was ~5×10⁻¹⁰.
+
+**Correction:** new externally seeded founders now receive up to **four times morphology construction energy** (bounded by existing storage capacity, and explicitly counted as an external input), rather than two times. Funded eggs now include a newborn reserve equal to at least one construction-energy budget instead of a fixed 60-unit reserve; all funding still comes from the parent and remaining reserve is genuinely transferred on hatch. This is a finite calibration, not a new source of energy or a guarantee of sustainable foraging; the higher egg cost introduces a genuine parent/offspring trade-off, with the parent retaining at least its own structural-energy budget after the egg is funded. Basal, motors, genome traits, water drag and chemical conversion remain unchanged.
+
+**Causal observability:** lifetime basal/motor spending, egg funding and predation losses are separated from actual food gain. Starvation, physical-bite depletion and old-age deaths are counted and a bounded recent death history exposed; deaths are now processed *after all oral contacts* so an organism consumed late in a tick cannot erroneously survive that tick. The UI inspector and energy ledger expose these values in simulated seconds. A current-only Lifecycle-and-Energy Wiki page documents the implementation.
+
+**Same-horizon v0.2.8 result (seed 4242, 45 simulated seconds):** 15 living organisms, 3 deaths, 4 genuinely funded hatchings and 8 eggs remaining versus 9 living, 5 deaths and no eggs in v0.2.7. All 14 original founders survived through 20 seconds. In v0.2.8, 45-second genuine food absorption was ~319 chemical units and the world chemical residual was about -2×10⁻⁹ units. This is a limited measured improvement, not the end of the mortality or self-sustaining-population problem.
+
+**Limits:** Any later mortality still requires actual nutrition, locomotion and predator/prey improvements. These changes preserve the existing genome schema, including legacy tri-limb constructor. No change to VIDA 2D or nonphysical survival mechanism.
+
 ## 2026-10-20 — v0.2.7 Phase A: UI identity, audio looping and current Wiki source
 
 The visible version now follows `package.json` on the header, start screen and simulation menu, with the exact creator credit. The manual pioneer button offers current planar/serpent/fin-tail starters rather than the legacy default tri-limb, without removing that genotype or changing saves.

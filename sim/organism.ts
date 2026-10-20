@@ -125,6 +125,9 @@ export class OrganismInstance {
   public structuralEnergy: number;
   public reserveCapacity: number;
   public totalMotorChemicalSpent: number = 0;
+  public totalBasalChemicalSpent: number = 0;
+  public totalEggFundingSpent: number = 0;
+  public totalPredationChemicalLost: number = 0;
   public ageSec: number = 0;
   public isDead: boolean = false;
   public lastReproduceSec: number = 0;
