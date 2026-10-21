@@ -26,7 +26,7 @@ function measure(shape: Shape, seconds=10) {
       if(i===seconds*30-1)half=o.com.distanceTo(start);
     }
     return {shape,parts:o.bodies.length,joints:o.joints.length,seconds,
-      net:o.com.distanceTo(start),forward:o.com.z-start.z,path,half,
+      net:o.com.distanceTo(start),worldZ:o.com.z-start.z,towardMouth:start.z-o.com.z,path,half,
       remainingReserve:o.reserves,startingReserve,motorWork:o.totalWorkJoules,
       gap,axis,worldSteps:sim.physicsStepCount,
       residual:sim.getTelemetry().chemicalEnergyLedger.conservationResidual,
@@ -46,8 +46,8 @@ test('new planar and 3D serpent founders move farther under living neural contro
     assert.ok(o.remainingReserve>0&&o.remainingReserve<o.startingReserve&&o.motorWork>0);
     assert.ok(Math.abs(o.residual)<1e-5);
   }
-  assert.ok(planar.forward>1.65,'planar improvement over 0.968m baseline');
-  assert.ok(serpent.forward>.95,'serpent improvement over 0.497m baseline');
+  assert.ok(planar.towardMouth>1.65,'new planar founder swims mouth-first, not tail-first');
+  assert.ok(serpent.worldZ>.95,'nonplanar serpent retains its measured +Z swimming pending a viable head-first gait');
 });
 
 test('trilimb slow gait is measured without claiming an untested speed improvement',()=>{

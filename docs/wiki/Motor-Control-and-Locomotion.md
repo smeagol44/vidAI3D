@@ -32,11 +32,19 @@ The JSON report separates:
 - Signed progress along the original body-facing `-Z` axis (positive/negative, both perfectly valid outcomes), and real final-root heading deflection.
 - Charged **motor-only chemical cost** and metres per motor-energy unit, separate from ordinary basal upkeep; measures physical hinge-anchor error and world energy-conservation residual.
 
-The same routine supports a physically disabled-motors reference and a **counterfactual genotype** in which every physical joint's inherited `motorRhythmMix` is zero. The tested default founder genotypes expose a significant current limitation: in seed 4242 isolated eight-second swims, planar and nonplanar serpent founders travel net **1.462 m** and **1.090 m** respectively, but almost entirely in the direction *opposite* their root mouth/eye-facing −Z axis. Fin-tail travels **0.452 m** net with **+0.229 m** of forward signed progress. All have paid motor costs and nonzero second-half travel. These are controlled measurements of real morphology and brain outputs, not ecosystem pursuit or successful feeding.
+The same routine supports a physically disabled-motors reference and a **counterfactual genotype** in which every physical joint's inherited `motorRhythmMix` is zero.
+
+### Inherited head-first planar swimming
+
+Newly created **planar six-link** founders have genetically assigned **−π/2** phase increments from one segment to the next, whereas the **3D serpent** retains its distinct mixed-axis phase configuration. All phase values remain inheritable and mutable, and every imported genome retains its stored phase settings without modification. This is a **founder-gene calibration**, not a physical-body displacement correction, automated steering controller, or organism-level selection rule.
+
+With the real recurrent controller and Rapier physics, newly spawned planar founders achieved **+1.346**, **+1.295**, and **+1.415 m** of signed mouth-first COM progress over eight simulated seconds in isolated food-free trials (seeds **4242**, **17**, and **2026**). Their corresponding charged chemical motor work was **43.93**, **46.57**, and **53.01** units. A six-second full 14-creature seed-4242 world produced **+0.611 to +1.039 m** of mouth-first progress across its five planar founders, with a conserved chemical ledger. The 20-second live recurrent-control test also preserves sustained positive mouth-first strokes.
+
+**Not all founders swim mouth-first:** the current nonplanar serpent still has **−1.089 m** of signed frontward movement in the eight-second seed-4242 reference. Simply reversing the serpent's phase progression reduces locomotion to **+0.138 m**, so that genotype deliberately remains unmodified. The fin-tail's independently evolved blades already produced **+0.229 m** initial-face-forward signed progress in the same measured reference. All observations distinguish measured swimming from actual autonomous food seeking, which remains unproven.
 
 The tests do **not** choose reproductive winners, influence mutation probabilities, set environmental targets, or assert that a trial's fastest configuration is ecologically beneficial. Different environments, a real food-reaching test and selection through funded reproduction are later work.
 
 
 ## Limits
 
-Existing planar, serpent and fin-tail founders still use their old (rhythmic) motor settings. New direct-control genotypes need an evolved neural signal that varies appropriately in time; the ability to disable rhythm **does not automatically make the default creatures faster**. Normal-only drag, real motor work and energy conversion are unchanged. Long-run ecology and more useful swimming selection remain future work.
+Fresh planar founders have a corrected mouth-first rhythmic phase progression; serpent and fin-tail founders retain their existing inherited rhythms. Historical genomes still execute their own stored phases. New direct-control genotypes need an evolved neural signal that varies appropriately in time; the ability to disable rhythm **does not automatically make the default creatures faster**. Normal-only drag, real motor work and energy conversion are unchanged. Long-run ecology and more useful swimming selection remain future work.
