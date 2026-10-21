@@ -54,11 +54,9 @@ test('isolated living founders swim head-first under real neural and energy cont
      assert.ok(v.net>0 && v.path+1e-8>=v.net && v.spent>0 && v.basal>0);
      assert.ok(v.maxGap<.005 && Math.abs(v.ledger)<1e-5);
    }
-   if(seed===4242){
-     assert.ok(modern.headward>1,'mouth-first sustained COM travel');
-     assert.ok(old.headward< -1,'unchanged old DNA moves tail-first');
-     assert.ok(modern.spent<=old.spent*1.2,'no excessive chemical cost for head-first swimming');
-   }
+   assert.ok(modern.headward>1,'new DNA swims mouth-first across tested seeds');
+   assert.ok(old.headward< -1,'unchanged old DNA still swims tail-first');
+   assert.ok(modern.spent<=old.spent*1.2,'no excessive chemical cost for head-first swimming');
  }
 });
 
@@ -75,6 +73,8 @@ test('full default ecosystem preserves finite physically funded motion with new 
   }));
   console.log('PLANAR_FULL_WORLD_0211',JSON.stringify({progress,energy:s.getTelemetry().chemicalEnergyLedger.conservationResidual}));
   assert.ok(progress.every(v=>Number.isFinite(v.headward)&&Number.isFinite(v.net)));
+  assert.ok(progress.every(v=>v.headward>.25),'every planar founder in this physical 14-creature trial progresses toward its own mouth');
+  assert.ok(progress.every(v=>v.motor>0),'all real swimming must have paid chemical motor work');
   assert.ok(Math.abs(s.getTelemetry().chemicalEnergyLedger.conservationResidual)<1e-5);
  } finally{s.dispose();}
 });

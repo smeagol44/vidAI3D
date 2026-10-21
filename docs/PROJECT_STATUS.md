@@ -1,5 +1,23 @@
 # VIDA 3D project status
 
+## 2026-10-20 — v0.2.11 Phase B: physically verified mouth-first planar founder
+
+The previous current planar swimmer used a genetically prescribed **positive** phase progression (per-part +π/2) along its six-link body. Its actual head and feeding/visual organs face **local −Z**, but the resulting real-physics traveling wave pushed the center of mass overwhelmingly toward +Z. This was a locomotion/foraging-direction defect, not weak torque or an animation problem.
+
+**Bounded correction:** only **newly created** planar starter genomes now inherit **−π/2 phase progression per segment** (wrapped into [0, 2π)). Their body geometry, organ positions, neural graph, motor torque, oscillator frequency, normal-only fluid resistance and chemical costs are unchanged; only mutable founder phase genes differ. No general rule forces actual movement to face the mouth, no artificial thrust is applied, and imported/saved genomes keep their original phases and ancestry.
+
+**Actual WorldSimulation and Rapier measurements, eight simulated seconds, no food, same live RNN and finite startup energy**:
+
+| Seed | Newly spawned planar, mouth-first signed COM movement | Historic-phase counterfactual, signed movement |
+| --- | ---: | ---: |
+| 4242 | +1.3461 m (43.93 motor chemical units) | −1.4619 m (46.91 units) |
+| 17 | +1.2954 m (46.57 units) | −1.4713 m (46.67 units) |
+| 2026 | +1.4152 m (53.01 units) | −1.4092 m (52.28 units) |
+
+A separate six-second **full 14-creature production world, seed 4242** recorded each of its five planar founders swimming in its actual initial mouth-facing direction: **+0.611, +1.039, +1.038, +0.934, +0.958 m**. The live recurrent-control 20-second isolated regression also preserves repeated mouth-first strokes (3.858 m total signed head-first movement). Physical hinge stability, metabolic charges, energy conservation and existing short production-world mortality/regression tests remain verified.
+
+**Trade-off and open defect:** phase reversal sacrifices ~0.1 m of eight-second planar net displacement on the first tested seed but makes it **mouth-first**, without exceeding 1.2× motor cost across the tested seeds. The mixed-axis **3D serpent remains unchanged**: merely reversing its inherited phases yields only **+0.138 m** forward instead of **−1.089 m** backward net headwise progress on seed 4242. Fin-tail already has positive signed mouth-front progress. Do not generalize this planar correction into all shapes or claim that seeing food, acquiring food, steering adaptively, or sustaining populations is now demonstrated. VIDA 2D was consulted in earlier phases and is unchanged.
+
 ## 2026-10-20 — v0.2.10 Phase B: sustained swimming audit (diagnostic only)
 
 An opt-in, bounded locomotion benchmark now runs each published founding anatomy with its **actual inherited recurrent neural controller**, live Rapier hinges, normal-only water resistance, biologically charged motors and the production WorldSimulation. In isolated still water, the test explicitly disables food/inflow and additional organisms/eggs, **without adding energy or motion**. Paired heading trials rotate the complete same-genotype body and its existing eyes. A no-motor control and an optional heritable direct-motor allele counterfactual are supported.
