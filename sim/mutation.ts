@@ -214,7 +214,13 @@ export function createFounderGenome(id: string, name: string, prng: PRNG, type: 
     for(const [i,p] of parts.entries()){
       p.dimX=1;p.dimY=1;p.dimZ=3;p.minAngle=-Math.PI/3;p.maxAngle=Math.PI/3;
       p.hingeAxis=type==='3d_serpent' && i===2 ? 'X':'Y';
-      p.motorPhase=i*(type==='3d_serpent' ? Math.PI/3 : Math.PI/2);
+      // The planar founder's positive axial phase gradient propelled it
+      // backward, away from its root -Z mouth/eye. In still water the
+      // inherited negative gradient produces actual mouth-first COM progress.
+      // The 3D serpent is deliberately unchanged: simply reversing its
+      // mixed pitch/yaw wave loses most of its displacement.
+      const axialPhaseStep = type === '3d_serpent' ? Math.PI / 3 : -Math.PI / 2;
+      p.motorPhase = THREE.MathUtils.euclideanModulo(i * axialPhaseStep, 2 * Math.PI);
     }
   }
   if(type==='tri_limb') parts[2].motorPhase=parts[1].motorPhase+Math.PI/2;
