@@ -51,14 +51,14 @@ function measureLiveTravel(control: Control, seconds = 20) {
       }
       for (const value of org.brain.outputs) { outputMagnitude += Math.abs(value); outputCount++; }
       if (lead.jointPhase < previousPhase) {
-        strokeProgress.push(org.com.z - strokeStart.z);
+        strokeProgress.push(strokeStart.z - org.com.z);
         strokeStart.copy(org.com);
       }
       previousPhase = lead.jointPhase;
     }
     return {
       control, seconds, netMeters: org.com.distanceTo(start), pathMeters: path,
-      forwardMeters: org.com.z - start.z, strokeProgress, maxPhaseError,
+      headFirstMeters: start.z - org.com.z, strokeProgress, maxPhaseError,
       maxAnchorGap, targetSpan: maxTarget - minTarget, realizedSpan: maxReal - minReal,
       meanAbsOutput: outputMagnitude / outputCount, reserve: org.reserves,
       work: org.totalWorkJoules, worldSteps: sim.physicsStepCount,
@@ -85,14 +85,14 @@ test('live recurrent founder travels usefully without losing the inherited strok
     assert.ok(measurement.pathMeters >= measurement.netMeters);
   }
   assert.ok(neutral.netMeters > 2.2);
-  // The previous production recurrent controller went backwards and managed
-  // 1.208 m net / 20 s; independent frequency modulation alone achieved .563 m.
-  assert.ok(recurrent.forwardMeters > 1.9, 'real recurrent outputs must preserve forward progress');
+  // Positive head-first progress points toward the actual root mouth/eye (-Z).
+  // The old positive-world-Z check accidentally rewarded tail-first swimming.
+  assert.ok(recurrent.headFirstMeters > 1.9, 'real recurrent outputs must preserve mouth-first progress');
   assert.ok(recurrent.netMeters > neutral.netMeters * .8);
   assert.ok(recurrent.meanAbsOutput > .02, 'do not silently neutralize the live brain');
   assert.ok(recurrent.strokeProgress.slice(-5).every(v => v > .13), 'last five strokes must keep producing forward travel');
   assert.ok(recurrent.maxPhaseError < .5, 'neural modulation must not unwind the inherited phase relationships');
-  assert.ok(frequencyOnly.forwardMeters > 1.8, 'frequency modulation alone must not reverse or stall swimming');
+  assert.ok(frequencyOnly.headFirstMeters > 1.8, 'frequency modulation alone must not reverse or stall mouth-first swimming');
 });
 
 test('new motor-output priors are heritable and can evolve through mutations', () => {
